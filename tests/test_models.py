@@ -48,3 +48,10 @@ def test_comments_have_unique_ids(tmp_path):
     a = request.add_comment(file="foo.py", first_line=1, last_line=1, body="first")
     b = request.add_comment(file="foo.py", first_line=2, last_line=2, body="second")
     assert a.id != b.id
+
+
+@pytest.mark.rule("request-id-unique")
+def test_requests_have_unique_ids(tmp_path):
+    a = Request(summary="test", repo_root=tmp_path)
+    b = Request(summary="test", repo_root=tmp_path)
+    assert a.id != b.id

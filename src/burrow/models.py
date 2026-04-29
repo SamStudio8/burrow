@@ -27,6 +27,7 @@ class Request:
     summary: str
     repo_root: Path
     comments: list[Comment] = field(default_factory=list)
+    id: UUID = field(default_factory=uuid4)
 
     def add_comment(self, file, first_line, last_line, body):
         path = self.repo_root / file
