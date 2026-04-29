@@ -10,6 +10,17 @@ def test_init_is_valid_subcommand(tmp_path, monkeypatch):
         main()
 
 
+@pytest.mark.rule("init-summary-optional")
+@pytest.mark.parametrize("argv", [
+    ["burrow", "init", "my review summary"],
+    ["burrow", "init"],
+])
+def test_init_accepts_optional_summary(tmp_path, monkeypatch, argv):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", argv):
+        main()
+
+
 @pytest.mark.rule("init-excantcreat")
 def test_init_fails_if_session_exists(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
