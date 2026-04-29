@@ -18,13 +18,16 @@ Burrow is not an agent. It is the interface between a human reviewer and an agen
 
 | Term | Definition |
 |---|---|
-| Agent | An external coding agent (e.g. Codex, Claude Code) that receives comments and produces code changes. Burrow treats the agent as a black box. |
-| Comment | A structured annotation attached to a location in a diff by the reviewer, expressing a concern, request, or observation. |
-| Diff | A set of file changes, expressed as a unified diff, that the reviewer is evaluating. |
-| Request | A JSON payload sent to the agent containing the reviewer's comments for a session. |
-| Response | A JSON payload returned by the agent in reply to a Request. |
-| Reviewer | The human operator using Burrow in the terminal to inspect a diff and author comments. |
-| Session | A single review lifecycle: from loading a diff to dispatching a Request to the agent and receiving a Response. |
+| Agent | An external coding agent (e.g. Codex, Claude Code) that receives a Request and produces code changes. Burrow treats the agent as a black box. |
+| Anchor | A location reference within a file: a tuple of `(file, first_line, last_line)`. A single-line anchor has `first_line == last_line`. A file-level anchor has `first_line == last_line == 0`. An anchor may be updated by the agent in its Response if the referenced code has moved. |
+| Comment | A structured annotation authored by the reviewer, carrying an anchor, a markdown body, and a stable id. |
+| Diff | A set of file changes that the reviewer is evaluating. The agent is assumed to have access to the diff via the repo. |
+| Reply | An agent's response to a single Comment, carrying a status, a body, and optionally a revised anchor. |
+| Request | A JSON document sent to the agent containing a unique id, a timestamp, a summary, and the reviewer's list of Comments. |
+| Response | A JSON document returned by the agent containing the originating request id, a timestamp, a summary, agent metadata, and a list of Replies. |
+| Reviewer | The human operator using Burrow in the terminal to inspect a diff and author Comments. |
+| Session | A single review lifecycle: from authoring Comments to dispatching a Request and receiving a Response. |
+| Status | The outcome field on a Reply. One of: `done` (agent believes the change was implemented), `partial` (change was partially implemented), `refused` (agent chose not to make the change), `blocked` (agent was unable to make the change). |
 
 ---
 
