@@ -27,6 +27,7 @@ Burrow is not an agent. It is the interface between a human reviewer and an agen
 | Response | A JSON document returned by the agent containing the originating request id, a timestamp, a summary, agent metadata, and a list of Replies. |
 | Reviewer | The human operator using Burrow in the terminal to inspect a diff and author Comments. |
 | Session | A single review lifecycle: from authoring Comments to dispatching a Request and receiving a Response. |
+| Sysexit | A BSD standard exit code from `sysexits.h`, used by Burrow to signal error conditions to the shell. |
 | Status | The outcome field on a Reply. One of: `done` (agent believes the change was implemented), `partial` (change was partially implemented), `refused` (agent chose not to make the change), `blocked` (agent was unable to make the change). |
 
 ---
@@ -56,13 +57,14 @@ Reviewers need a structured way to communicate feedback on agent-produced code c
 flowchart TD
     summary([summary])
     --> create_request[Create request]
+    --> write[Write .burrow/request.json]
     --> request([Request])
     --> add_comment[Add comment]
     --> validate[Validate comment]
     --> valid{Valid?}
     valid -- no --> error([Error])
     valid -- yes --> attach[Attach comment]
-    attach --> request
+    attach --> write
 ```
 
 | Node | Slug | Statement | Tags |
@@ -75,6 +77,47 @@ flowchart TD
 | validate | `anchor-range-valid` | SHALL reject a comment whose `first_line` and `last_line` do not form a valid range within the file. | data, error |
 | validate | `comment-body-nonempty` | SHALL reject a comment whose body is empty or consists only of whitespace. | data, error |
 | attach | `comment-id-unique` | SHALL assign a unique identifier to each created comment. | data |
+| write | `write-session` | SHALL write the current request to `.burrow/request.json` after creation and after each comment is attached. | data |
+
+---
+
+#### SCN-CLI-INIT: User initialises a session
+
+```mermaid
+flowchart TD
+    input([burrow init summary?])
+    --> exists{.burrow/request.json exists?}
+    exists -- yes --> error([EX_CANTCREAT])
+    exists -- no --> create[[SCN-REQUEST]]
+    --> done([EX_OK])
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| input | `init-invocation` | SHALL be invoked as `burrow init`. | interface |
+| input | `init-summary-optional` | SHALL accept an optional summary argument. | interface |
+| exists | `init-excantcreat` | SHALL exit with `EX_CANTCREAT` if `.burrow/request.json` already exists. | error |
+
+---
+
+#### SCN-CLI-ADD: User adds a comment to an existing session
+
+```mermaid
+flowchart TD
+    input([burrow c file first_line last_line body])
+    --> args{Args valid?}
+    args -- no --> usage([EX_USAGE])
+    args -- yes --> session{.burrow/request.json exists?}
+    session -- no --> noinput([EX_NOINPUT])
+    session -- yes --> scn[[SCN-REQUEST]]
+    --> done([EX_OK])
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| input | `add-invocation` | SHALL be invoked as `burrow c`. | interface |
+| args | `add-usage` | SHALL exit with `EX_USAGE` if any argument is malformed or missing. | error |
+| session | `add-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`. | error |
 
 ---
 
@@ -108,3 +151,4 @@ _None defined yet._
 | D-1 | How does Burrow invoke the agent — subprocess, HTTP, stdin/stdout pipe? Burrow will eventually own the dispatch lifecycle; transport mechanism is not yet decided. |
 | ~~D-2~~ | ~~Does Burrow persist sessions across invocations, or is each run stateless?~~ Resolved: the Request and Response JSON files are the session state. |
 | ~~D-3~~ | ~~Is the diff always sourced from git, or can it be provided as a file?~~ Resolved: the agent is assumed to have repo access; the diff is not embedded in the Request. |
+| D-4 | SCN-PERSIST is not yet defined. Reading and writing `.burrow/request.json` is currently handled within SCN-REQUEST and should be extracted into a dedicated persistence scenario as the system grows. |
