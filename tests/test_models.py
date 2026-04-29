@@ -64,3 +64,9 @@ def test_request_records_creation_timestamp(tmp_path):
     request = Request(summary="test", repo_root=tmp_path)
     after = datetime.now(timezone.utc)
     assert before <= request.created_at <= after
+
+
+@pytest.mark.rule("request-repo-root")
+def test_request_records_repo_root(tmp_path):
+    request = Request(summary="test", repo_root=tmp_path)
+    assert request.repo_root == tmp_path
