@@ -29,6 +29,9 @@ class Request:
     comments: list[Comment] = field(default_factory=list)
 
     def add_comment(self, file, first_line, last_line, body):
+        path = self.repo_root / file
+        if not path.is_file():
+            raise ValueError(f"{file} does not exist in repo")
         comment = Comment(file=file, first_line=first_line, last_line=last_line, body=body)
         self.comments.append(comment)
         return comment
