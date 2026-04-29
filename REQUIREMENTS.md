@@ -75,6 +75,6 @@ _None defined yet._
 
 | # | Question |
 |---|---|
-| D-1 | How does Burrow invoke the agent — subprocess, HTTP, stdin/stdout pipe? The JSON exchange protocol implies a boundary but the transport is not yet decided. |
-| D-2 | Does Burrow persist sessions across invocations, or is each run stateless? |
-| D-3 | Is the diff always sourced from git, or can it be provided as a file? |
+| D-1 | How does Burrow invoke the agent — subprocess, HTTP, stdin/stdout pipe? Burrow will eventually own the dispatch lifecycle; transport mechanism is not yet decided. |
+| ~~D-2~~ | ~~Does Burrow persist sessions across invocations, or is each run stateless?~~ Resolved: the Request and Response JSON files are the session state. |
+| ~~D-3~~ | ~~Is the diff always sourced from git, or can it be provided as a file?~~ Resolved: the agent is assumed to have repo access; the diff is not embedded in the Request. |
