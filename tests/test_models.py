@@ -70,3 +70,10 @@ def test_request_records_creation_timestamp(tmp_path):
 def test_request_records_repo_root(tmp_path):
     request = Request(summary="test", repo_root=tmp_path)
     assert request.repo_root == tmp_path
+
+
+@pytest.mark.rule("write-session")
+def test_save_writes_session_file(tmp_path):
+    request = Request(summary="test", repo_root=tmp_path)
+    request.save()
+    assert (tmp_path / ".burrow" / "request.json").exists()

@@ -1,7 +1,18 @@
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
+
+
+def _serialise(obj):
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, Path):
+        return str(obj)
+    raise TypeError(f"cannot serialise {type(obj)}")
 
 
 @dataclass
@@ -41,3 +52,18 @@ class Request:
         comment = Comment(file=file, first_line=first_line, last_line=last_line, body=body)
         self.comments.append(comment)
         return comment
+
+    def save(self):
+        session_dir = self.repo_root / ".burrow"
+        session_dir.mkdir(exist_ok=True)
+        data = {
+            "id": self.id,
+            "created_at": self.created_at,
+            "summary": self.summary,
+            "repo_root": self.repo_root,
+            "comments": [
+                {"id": c.id, "file": c.file, "first_line": c.first_line, "last_line": c.last_line, "body": c.body}
+                for c in self.comments
+            ],
+        }
+        (session_dir / "request.json").write_text(json.dumps(data, default=_serialise, indent=2))
