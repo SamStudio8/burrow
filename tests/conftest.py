@@ -1,4 +1,13 @@
+import json
+from pathlib import Path
 import pytest
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def example_request():
+    return json.loads((FIXTURES / "request.json").read_text())
 
 
 def pytest_addoption(parser):

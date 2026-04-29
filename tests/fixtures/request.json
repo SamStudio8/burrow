@@ -1,0 +1,22 @@
+{
+  "id": "e70e4af9-ed59-4803-9d9f-1c55146272c8",
+  "created_at": "2026-04-29T20:31:11.797002+00:00",
+  "summary": "First review",
+  "repo_root": ".",
+  "comments": [
+    {
+      "id": "6a416909-fdbd-4bd9-aba0-9ff364cf578b",
+      "file": "src/burrow/models.py",
+      "first_line": 1,
+      "last_line": 1,
+      "body": "Consider adding a module docstring."
+    },
+    {
+      "id": "4898752c-8eba-491c-a36d-02e6dce82658",
+      "file": "src/burrow/models.py",
+      "first_line": 34,
+      "last_line": 43,
+      "body": "This validation block is getting long - could be a private method."
+    }
+  ]
+}
