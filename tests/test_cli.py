@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch
-from burrow.cli import main
+from burrow.cli import main, EX_CANTCREAT, EX_NOINPUT
 
 
 @pytest.mark.rule("init-invocation")
@@ -37,7 +37,7 @@ def test_add_fails_with_no_session(tmp_path, monkeypatch, capsys):
     with patch("sys.argv", ["burrow", "c", "foo.py", "1", "1", "a comment"]):
         with pytest.raises(SystemExit) as exc:
             main()
-    assert exc.value.code == 66
+    assert exc.value.code == EX_NOINPUT
     assert "session" in capsys.readouterr().err
 
 
@@ -49,5 +49,5 @@ def test_init_fails_if_session_exists(tmp_path, monkeypatch, capsys):
     with patch("sys.argv", ["burrow", "init"]):
         with pytest.raises(SystemExit) as exc:
             main()
-    assert exc.value.code == 73
+    assert exc.value.code == EX_CANTCREAT
     assert "session already exists" in capsys.readouterr().err
