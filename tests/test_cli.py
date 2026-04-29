@@ -21,6 +21,16 @@ def test_init_accepts_optional_summary(tmp_path, monkeypatch, argv):
         main()
 
 
+@pytest.mark.rule("add-invocation")
+def test_add_is_valid_subcommand(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "foo.py").write_text("hello\n")
+    with patch("sys.argv", ["burrow", "init"]):
+        main()
+    with patch("sys.argv", ["burrow", "c", "foo.py", "1", "1", "a comment"]):
+        main()
+
+
 @pytest.mark.rule("init-excantcreat")
 def test_init_fails_if_session_exists(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
