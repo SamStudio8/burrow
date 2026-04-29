@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch
-from burrow.cli import main, EX_CANTCREAT, EX_NOINPUT
+from burrow.cli import main, EX_CANTCREAT, EX_NOINPUT, EX_USAGE
 
 
 @pytest.mark.rule("init-invocation")
@@ -29,6 +29,15 @@ def test_add_is_valid_subcommand(tmp_path, monkeypatch):
         main()
     with patch("sys.argv", ["burrow", "c", "foo.py", "1", "1", "a comment"]):
         main()
+
+
+@pytest.mark.rule("add-usage")
+def test_add_fails_with_missing_args(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "c"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == EX_USAGE
 
 
 @pytest.mark.rule("add-noinput")

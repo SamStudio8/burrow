@@ -29,8 +29,14 @@ def cmd_add(args):
     request.save()
 
 
+class BurrowParser(argparse.ArgumentParser):
+    def error(self, message):
+        sys.stderr.write(f"error: {message}\n")
+        sys.exit(EX_USAGE)
+
+
 def main():
-    parser = argparse.ArgumentParser(prog="burrow")
+    parser = BurrowParser(prog="burrow")
     subparsers = parser.add_subparsers(dest="command")
 
     init_parser = subparsers.add_parser("init")
