@@ -8,7 +8,7 @@ Author: SN
 
 ## Introduction
 
-Burrow is a terminal tool for reviewing code changes produced by coding agents (e.g. Codex, Claude Code). A human reviewer inspects a diff in the terminal, attaches structured comments to specific locations in the diff, and triggers the coding agent to address those comments. Burrow exchanges JSON with the agent: a comment payload goes out, and a receipt payload comes back confirming which comments were addressed.
+Burrow is a terminal tool for reviewing code changes produced by coding agents (e.g. Codex, Claude Code). A human reviewer inspects a diff in the terminal, attaches structured comments to specific locations in the diff, and triggers the coding agent to address those comments. Burrow exchanges JSON with the agent: a Request carrying the reviewer's comments goes out, and a Response comes back from the agent.
 
 Burrow is not an agent. It is the interface between a human reviewer and an agent. It does not generate code, interpret comments, or decide how to act on them — that is the agent's responsibility.
 
@@ -21,9 +21,10 @@ Burrow is not an agent. It is the interface between a human reviewer and an agen
 | Agent | An external coding agent (e.g. Codex, Claude Code) that receives comments and produces code changes. Burrow treats the agent as a black box. |
 | Comment | A structured annotation attached to a location in a diff by the reviewer, expressing a concern, request, or observation. |
 | Diff | A set of file changes, expressed as a unified diff, that the reviewer is evaluating. |
-| Receipt | A JSON payload returned by the agent acknowledging which comments it has addressed and how. |
+| Request | A JSON payload sent to the agent containing the reviewer's comments for a session. |
+| Response | A JSON payload returned by the agent in reply to a Request. |
 | Reviewer | The human operator using Burrow in the terminal to inspect a diff and author comments. |
-| Session | A single review lifecycle: from loading a diff to dispatching comments to the agent and receiving receipts. |
+| Session | A single review lifecycle: from loading a diff to dispatching a Request to the agent and receiving a Response. |
 
 ---
 
