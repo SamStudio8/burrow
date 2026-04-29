@@ -71,6 +71,7 @@ flowchart TD
 |---|---|---|---|
 | create_request | `request-id-unique` | SHALL assign a unique identifier to each created request. | data |
 | create_request | `request-created-at` | SHALL record the creation timestamp when a request is created. | data |
+| create_request | `request-repo-root` | SHALL record the working directory at the time of creation as the repo root. | data |
 | validate | `anchor-file-exists` | SHALL reject a comment whose file path does not resolve to an existing file within the repo. | data, error |
 | validate | `anchor-zero-paired` | SHALL reject a comment where exactly one of `first_line` or `last_line` is zero. | data, error |
 | validate | `anchor-lines-positive` | SHALL reject a comment where either line number is negative. | data, error |
