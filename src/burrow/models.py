@@ -23,6 +23,8 @@ class Request:
             raise ValueError("body must not be empty or whitespace")
         if first_line < 0 or last_line < 0:
             raise ValueError("line numbers must not be negative")
+        if (first_line == 0) != (last_line == 0):
+            raise ValueError("first_line and last_line must both be zero or neither")
         comment = Comment(
             id=uuid4(),
             file=file,
