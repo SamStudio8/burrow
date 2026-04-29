@@ -44,7 +44,32 @@ flowchart TD
 
 ## Capabilities
 
-_To be populated as capabilities are agreed._
+### CAP-REVIEW: User requests changes and agent responds
+
+Reviewers need a structured way to communicate feedback on agent-produced code changes and receive an account of how that feedback was addressed. Burrow provides the data model and tooling to author a Request, dispatch it to an agent, and parse the resulting Response.
+
+---
+
+#### SCN-COMMENT: User creates an anchored comment
+
+```mermaid
+flowchart TD
+    input([file, first_line, last_line, body])
+    --> validate[Validate comment]
+    --> valid{Valid?}
+    valid -- no --> error([Error])
+    valid -- yes --> create[Create comment]
+    --> output([Comment])
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| validate | `anchor-file-exists` | SHALL reject a comment whose file path does not resolve to an existing file within the repo. | data, error |
+| validate | `anchor-zero-paired` | SHALL reject a comment where exactly one of `first_line` or `last_line` is zero. | data, error |
+| validate | `anchor-lines-positive` | SHALL reject a comment where either line number is negative. | data, error |
+| validate | `anchor-range-valid` | SHALL reject a comment whose `first_line` and `last_line` do not form a valid range within the file. | data, error |
+| validate | `comment-body-nonempty` | SHALL reject a comment whose body is empty or consists only of whitespace. | data, error |
+| create | `comment-id-unique` | SHALL assign a unique identifier to each created comment. | data |
 
 ---
 
