@@ -1,3 +1,4 @@
+import json
 import pytest
 from datetime import datetime, timezone
 from burrow.models import Comment, Request
@@ -70,6 +71,18 @@ def test_request_records_creation_timestamp(tmp_path):
 def test_request_records_repo_root(tmp_path):
     request = Request(summary="test", repo_root=tmp_path)
     assert request.repo_root == tmp_path
+
+
+@pytest.mark.rule("load-session")
+def test_load_reconstructs_request(tmp_path, example_request):
+    (tmp_path / ".burrow").mkdir()
+    (tmp_path / ".burrow" / "request.json").write_text(json.dumps(example_request))
+    request = Request.load(tmp_path)
+    assert str(request.id) == example_request["id"]
+    assert request.summary == example_request["summary"]
+    assert len(request.comments) == len(example_request["comments"])
+    assert str(request.comments[0].id) == example_request["comments"][0]["id"]
+    assert request.comments[0].body == example_request["comments"][0]["body"]
 
 
 @pytest.mark.rule("write-session")

@@ -53,6 +53,27 @@ class Request:
         self.comments.append(comment)
         return comment
 
+    @classmethod
+    def load(cls, repo_root):
+        data = json.loads((repo_root / ".burrow" / "request.json").read_text())
+        comments = [
+            Comment(
+                file=c["file"],
+                first_line=c["first_line"],
+                last_line=c["last_line"],
+                body=c["body"],
+                id=UUID(c["id"]),
+            )
+            for c in data["comments"]
+        ]
+        return cls(
+            summary=data["summary"],
+            repo_root=Path(data["repo_root"]),
+            comments=comments,
+            id=UUID(data["id"]),
+            created_at=datetime.fromisoformat(data["created_at"]),
+        )
+
     def save(self):
         session_dir = self.repo_root / ".burrow"
         session_dir.mkdir(exist_ok=True)

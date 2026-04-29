@@ -55,11 +55,11 @@ Reviewers need a structured way to communicate feedback on agent-produced code c
 
 ```mermaid
 flowchart TD
-    summary([summary])
-    --> create_request[Create request]
-    --> write[Write .burrow/request.json]
-    --> request([Request])
-    --> add_comment[Add comment]
+    summary([summary]) --> create_request[Create request] --> write[Write .burrow/request.json]
+    session([.burrow/request.json]) --> load[Load request]
+    write --> request([Request])
+    load --> request
+    request --> add_comment[Add comment]
     --> validate[Validate comment]
     --> valid{Valid?}
     valid -- no --> error([Error])
@@ -72,6 +72,7 @@ flowchart TD
 | create_request | `request-id-unique` | SHALL assign a unique identifier to each created request. | data |
 | create_request | `request-created-at` | SHALL record the creation timestamp when a request is created. | data |
 | create_request | `request-repo-root` | SHALL record the working directory at the time of creation as the repo root. | data |
+| load | `load-session` | SHALL reconstruct a Request from `.burrow/request.json`, preserving all fields and comments. | data |
 | validate | `anchor-file-exists` | SHALL reject a comment whose file path does not resolve to an existing file within the repo. | data, error |
 | validate | `anchor-zero-paired` | SHALL reject a comment where exactly one of `first_line` or `last_line` is zero. | data, error |
 | validate | `anchor-lines-positive` | SHALL reject a comment where either line number is negative. | data, error |
