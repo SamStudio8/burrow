@@ -32,6 +32,9 @@ class Request:
         path = self.repo_root / file
         if not path.is_file():
             raise ValueError(f"{file} does not exist in repo")
+        line_count = len(path.read_text().splitlines())
+        if last_line > line_count:
+            raise ValueError(f"last_line {last_line} exceeds file length {line_count}")
         comment = Comment(file=file, first_line=first_line, last_line=last_line, body=body)
         self.comments.append(comment)
         return comment
