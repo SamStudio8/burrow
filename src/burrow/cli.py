@@ -17,12 +17,13 @@ def cmd_init(args):
         sys.exit(EX_CANTCREAT)
     request = Request(summary=args.summary or "", repo_root=Path.cwd())
     request.save()
+    sys.stderr.write("Session initialized at .burrow/request.json\n")
 
 
 def cmd_add(args):
     session = Path.cwd() / ".burrow" / "request.json"
     if not session.exists():
-        sys.stderr.write("error: no session found — run 'burrow init' first\n")
+        sys.stderr.write("No session found — run 'burrow init' first\n")
         sys.exit(EX_NOINPUT)
     request = Request.load(Path.cwd())
     request.add_comment(file=args.file, first_line=int(args.first_line), last_line=int(args.last_line), body=args.body)

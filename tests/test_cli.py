@@ -4,10 +4,11 @@ from burrow.cli import main, EX_CANTCREAT, EX_NOINPUT, EX_USAGE
 
 
 @pytest.mark.rule("init-invocation")
-def test_init_is_valid_subcommand(tmp_path, monkeypatch):
+def test_init_is_valid_subcommand(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     with patch("sys.argv", ["burrow", "init"]):
         main()
+    assert "Session initialized at .burrow/request.json" in capsys.readouterr().err
 
 
 @pytest.mark.rule("init-summary-optional")
