@@ -39,3 +39,12 @@ def test_comment_rejects_last_line_beyond_eof(tmp_path):
     (tmp_path / "foo.py").write_text("line1\nline2\nline3\n")
     with pytest.raises(ValueError):
         request.add_comment(file="foo.py", first_line=1, last_line=10, body="a comment")
+
+
+@pytest.mark.rule("comment-id-unique")
+def test_comments_have_unique_ids(tmp_path):
+    request = Request(summary="test", repo_root=tmp_path)
+    (tmp_path / "foo.py").write_text("line1\nline2\n")
+    a = request.add_comment(file="foo.py", first_line=1, last_line=1, body="first")
+    b = request.add_comment(file="foo.py", first_line=2, last_line=2, body="second")
+    assert a.id != b.id
