@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime, timezone
 from burrow.models import Comment, Request
 
 
@@ -55,3 +56,11 @@ def test_requests_have_unique_ids(tmp_path):
     a = Request(summary="test", repo_root=tmp_path)
     b = Request(summary="test", repo_root=tmp_path)
     assert a.id != b.id
+
+
+@pytest.mark.rule("request-created-at")
+def test_request_records_creation_timestamp(tmp_path):
+    before = datetime.now(timezone.utc)
+    request = Request(summary="test", repo_root=tmp_path)
+    after = datetime.now(timezone.utc)
+    assert before <= request.created_at <= after

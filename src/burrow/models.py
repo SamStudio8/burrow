@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -28,6 +29,7 @@ class Request:
     repo_root: Path
     comments: list[Comment] = field(default_factory=list)
     id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def add_comment(self, file, first_line, last_line, body):
         path = self.repo_root / file
