@@ -18,6 +18,8 @@ class Comment:
             raise ValueError("line numbers must not be negative")
         if (self.first_line == 0) != (self.last_line == 0):
             raise ValueError("first_line and last_line must both be zero or neither")
+        if self.last_line < self.first_line:
+            raise ValueError("last_line must not be less than first_line")
 
 
 @dataclass

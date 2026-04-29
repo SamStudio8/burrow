@@ -18,3 +18,9 @@ def test_comment_rejects_negative_line_numbers():
 def test_comment_rejects_partial_zero_anchor():
     with pytest.raises(ValueError):
         Comment(file="foo.py", first_line=0, last_line=1, body="a comment")
+
+
+@pytest.mark.rule("anchor-range-valid")
+def test_comment_rejects_last_line_before_first_line():
+    with pytest.raises(ValueError):
+        Comment(file="foo.py", first_line=5, last_line=3, body="a comment")
