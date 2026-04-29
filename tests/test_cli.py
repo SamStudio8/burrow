@@ -31,6 +31,16 @@ def test_add_is_valid_subcommand(tmp_path, monkeypatch):
         main()
 
 
+@pytest.mark.rule("add-noinput")
+def test_add_fails_with_no_session(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "c", "foo.py", "1", "1", "a comment"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == 66
+    assert "session" in capsys.readouterr().err
+
+
 @pytest.mark.rule("init-excantcreat")
 def test_init_fails_if_session_exists(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
