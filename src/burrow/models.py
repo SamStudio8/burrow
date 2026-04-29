@@ -21,6 +21,8 @@ class Request:
     def add_comment(self, file, first_line, last_line, body):
         if not body.strip():
             raise ValueError("body must not be empty or whitespace")
+        if first_line < 0 or last_line < 0:
+            raise ValueError("line numbers must not be negative")
         comment = Comment(
             id=uuid4(),
             file=file,
