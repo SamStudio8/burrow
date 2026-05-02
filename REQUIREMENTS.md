@@ -214,6 +214,98 @@ flowchart TD
 
 ---
 
+### CAP-TUI: Reviewer authors a request interactively
+
+The CLI commands (`burrow c`, `burrow start`) are sufficient for scripted use but are friction-heavy for interactive review. The TUI provides a keyboard-driven interface for browsing uncommitted changes, navigating to any line in any file, authoring comments, and editing the session summary — all without leaving the terminal.
+
+---
+
+#### SCN-TUI-OPEN: User opens the TUI
+
+```mermaid
+flowchart TD
+    input([burrow])
+    --> session{.burrow/request.json exists?}
+    session -- no --> start[[SCN-REQUEST: create]]
+    session -- yes --> load[[SCN-REQUEST: load]]
+    start --> tui([TUI])
+    load --> tui
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| input | `tui-invocation` | SHALL be invoked as `burrow` with no subcommand. | interface |
+| session | `tui-implicit-start` | SHALL create a new session if no session exists, equivalent to `burrow start`. | data |
+
+---
+
+#### SCN-TUI-DIFF: Diff view
+
+```mermaid
+flowchart TD
+    tui([TUI]) --> diff[Load diff]
+    diff --> hunks[Display hunks]
+    hunks --> nav[Navigate hunks and lines]
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| diff | `diff-source` | SHALL display all uncommitted changes in the repository (staged and unstaged). | data |
+| hunks | `diff-hunks` | SHALL display all hunks grouped by file. | interface, usability |
+| nav | `diff-nav-next-hunk` | SHALL support navigating to the next hunk. | usability |
+| nav | `diff-nav-prev-hunk` | SHALL support navigating to the previous hunk. | usability |
+| nav | `diff-nav-line` | SHALL support line-by-line navigation within a hunk. | usability |
+
+---
+
+#### SCN-TUI-FILE: File view
+
+```mermaid
+flowchart TD
+    tui([TUI]) --> goto[Go to file and line]
+    goto --> file[Display file at line]
+    file --> nav[Navigate lines]
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| goto | `file-goto` | SHALL allow the user to navigate to any file and line in the repository, not limited to the diff. | usability |
+| file | `file-display` | SHALL display the file with the target line in view. | usability |
+| nav | `file-nav-line` | SHALL support line-by-line navigation within the file view. | usability |
+
+---
+
+#### SCN-TUI-COMMENT: User authors a comment
+
+```mermaid
+flowchart TD
+    tui([TUI]) --> select[Select line or range]
+    select --> compose[Compose comment body]
+    compose --> attach[[SCN-REQUEST: add comment]]
+    attach --> valid{Valid?}
+    valid -- no --> error([Show error])
+    valid -- yes --> tui
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| select | `comment-select-line` | SHALL allow the user to mark a single line as the comment anchor. | usability |
+| select | `comment-select-range` | SHALL allow the user to mark a range of lines as the comment anchor. | usability |
+| select | `comment-select-any-file` | SHALL allow comments to be anchored to any line in any file, not limited to diff hunks. | usability |
+| compose | `comment-compose` | SHALL present an input for the user to type the comment body before attaching. | usability |
+| attach | `comment-attach-tui` | SHALL attach the comment to the current session and persist it, equivalent to `burrow c`. | data |
+| error | `comment-error-tui` | SHALL display validation errors inline without closing the TUI. | usability, error |
+
+---
+
+#### SCN-TUI-SUMMARY: User edits the session summary
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| — | `summary-edit-tui` | SHALL allow the user to edit the session summary at any time during the TUI session. | usability |
+
+---
+
 ## Tag Glossary
 
 ### Standard tags
@@ -242,6 +334,7 @@ _None defined yet._
 | # | Question |
 |---|---|
 | D-1 | How does Burrow invoke the agent — subprocess, HTTP, stdin/stdout pipe? Burrow will eventually own the dispatch lifecycle; transport mechanism is not yet decided. |
+| ~~D-5~~ | ~~Which framework should the TUI be built with?~~ Resolved: Textual. |
 | ~~D-2~~ | ~~Does Burrow persist sessions across invocations, or is each run stateless?~~ Resolved: the Request and Response JSON files are the session state. |
 | ~~D-3~~ | ~~Is the diff always sourced from git, or can it be provided as a file?~~ Resolved: the agent is assumed to have repo access; the diff is not embedded in the Request. |
 | D-4 | SCN-PERSIST is not yet defined. Reading and writing `.burrow/request.json` is currently handled within SCN-REQUEST and should be extracted into a dedicated persistence scenario as the system grows. |
