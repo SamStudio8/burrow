@@ -48,7 +48,7 @@ def test_add_fails_with_no_session(tmp_path, monkeypatch, capsys):
         with pytest.raises(SystemExit) as exc:
             main()
     assert exc.value.code == EX_NOINPUT
-    assert "session" in capsys.readouterr().err
+    assert "No session found" in capsys.readouterr().err
 
 
 @pytest.mark.rule("validate-invocation")
@@ -58,6 +58,16 @@ def test_validate_is_valid_subcommand(tmp_path, monkeypatch):
         main()
     with patch("sys.argv", ["burrow", "validate"]):
         main()
+
+
+@pytest.mark.rule("validate-noinput")
+def test_validate_fails_with_no_session(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "validate"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == EX_NOINPUT
+    assert "No session found" in capsys.readouterr().err
 
 
 @pytest.mark.rule("init-excantcreat")
