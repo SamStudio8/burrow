@@ -13,6 +13,15 @@ def test_tui_opens_with_no_subcommand(session):
     mock_run.assert_called_once()
 
 
+@pytest.mark.rule("tui-implicit-start")
+def test_tui_creates_session_if_none_exists(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow"]):
+        with patch("burrow.tui.BurrowApp.run"):
+            main()
+    assert (tmp_path / ".burrow" / "request.json").exists()
+
+
 @pytest.mark.rule("start-invocation")
 def test_start_is_valid_subcommand(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)

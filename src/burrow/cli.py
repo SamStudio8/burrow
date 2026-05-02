@@ -102,4 +102,6 @@ def main():
     if hasattr(args, "func"):
         args.func(args)
     else:
+        if _current_request() is None:
+            Request(summary="", repo_root=Path.cwd()).save()
         BurrowApp().run()
