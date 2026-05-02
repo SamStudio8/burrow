@@ -123,6 +123,16 @@ def test_send_fails_with_no_session(tmp_path, monkeypatch, capsys):
     assert "No session found" in capsys.readouterr().err
 
 
+@pytest.mark.rule("send-stdout")
+def test_send_writes_preamble_and_request_to_stdout(session, capsys):
+    with patch("sys.argv", ["burrow", "send"]):
+        main()
+    out = capsys.readouterr().out
+    assert "burrow" in out.lower()
+    request = Request.load(session)
+    assert str(request.id) in out
+
+
 @pytest.mark.rule("init-excantcreat")
 def test_init_fails_if_session_exists(session, capsys):
     capsys.readouterr()

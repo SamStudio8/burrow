@@ -1,7 +1,9 @@
 import argparse
+import json
 import sys
 from pathlib import Path
-from burrow.models import Request, Response
+from burrow.models import Request, Response, _serialise
+from burrow.preamble import PREAMBLE
 
 # did you know, you cant get these on windows
 EX_CANTCREAT = 73
@@ -51,6 +53,8 @@ def cmd_add(args):
 
 def cmd_send(args):
     request = _current_request(ex_on_noinput=True)
+    request_json = json.dumps(request.to_dict(), default=_serialise, indent=2)
+    sys.stdout.write(PREAMBLE + "\n\n" + request_json + "\n")
 
 
 class BurrowParser(argparse.ArgumentParser):

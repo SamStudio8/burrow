@@ -131,10 +131,8 @@ class Request(Document):
             created_at=datetime.fromisoformat(data["created_at"]),
         )
 
-    def save(self):
-        session_dir = self.repo_root / ".burrow"
-        session_dir.mkdir(exist_ok=True)
-        data = {
+    def to_dict(self):
+        return {
             "id": self.id,
             "created_at": self.created_at,
             "summary": self.summary,
@@ -144,4 +142,8 @@ class Request(Document):
                 for c in self.comments
             ],
         }
-        (session_dir / "request.json").write_text(json.dumps(data, default=_serialise, indent=2))
+
+    def save(self):
+        session_dir = self.repo_root / ".burrow"
+        session_dir.mkdir(exist_ok=True)
+        (session_dir / "request.json").write_text(json.dumps(self.to_dict(), default=_serialise, indent=2))
