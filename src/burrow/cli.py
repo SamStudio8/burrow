@@ -28,7 +28,7 @@ def cmd_start(args):
         sys.exit(EX_CANTCREAT)
     request = Request(summary=args.summary or "", repo_root=Path.cwd())
     request.save()
-    sys.stderr.write("Session initialized at .burrow/request.json\n")
+    sys.stderr.write("Session started at .burrow/request.json\n")
 
 
 def cmd_validate(args):

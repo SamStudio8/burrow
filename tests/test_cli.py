@@ -10,7 +10,7 @@ def test_start_is_valid_subcommand(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     with patch("sys.argv", ["burrow", "start"]):
         main()
-    assert "Session initialized at .burrow/request.json" in capsys.readouterr().err
+    assert "Session started at .burrow/request.json" in capsys.readouterr().err
 
 
 @pytest.mark.rule("start-summary-optional")
