@@ -69,17 +69,17 @@ flowchart TD
 
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
-| create_request | `request-id-unique` | SHALL assign a unique identifier to each created request. | data |
-| create_request | `request-created-at` | SHALL record the creation timestamp when a request is created. | data |
+| create_request | `request-id-unique` | SHALL assign a unique identifier to each created Request. | data |
+| create_request | `request-created-at` | SHALL record the creation timestamp when a Request is created. | data |
 | create_request | `request-repo-root` | SHALL record the working directory at the time of creation as the repo root. | data |
-| load | `load-session` | SHALL reconstruct a Request from `.burrow/request.json`, preserving all fields and comments. | data |
-| validate | `anchor-file-exists` | SHALL reject a comment whose file path does not resolve to an existing file within the repo. | data, error |
-| validate | `anchor-zero-paired` | SHALL reject a comment where exactly one of `first_line` or `last_line` is zero. | data, error |
-| validate | `anchor-lines-positive` | SHALL reject a comment where either line number is negative. | data, error |
-| validate | `anchor-range-valid` | SHALL reject a comment whose `first_line` and `last_line` do not form a valid range within the file. | data, error |
-| validate | `comment-body-nonempty` | SHALL reject a comment whose body is empty or consists only of whitespace. | data, error |
-| attach | `comment-id-unique` | SHALL assign a unique identifier to each created comment. | data |
-| write | `write-session` | SHALL write the current request to `.burrow/request.json` after creation and after each comment is attached. | data |
+| load | `load-session` | SHALL reconstruct a Request from `.burrow/request.json`, preserving all fields and Comments. | data |
+| validate | `anchor-file-exists` | SHALL reject a Comment whose file path does not resolve to an existing file within the repo. | data, error |
+| validate | `anchor-zero-paired` | SHALL reject a Comment where exactly one of `first_line` or `last_line` is zero. | data, error |
+| validate | `anchor-lines-positive` | SHALL reject a Comment where either line number is negative. | data, error |
+| validate | `anchor-range-valid` | SHALL reject a Comment whose `first_line` and `last_line` do not form a valid range within the file. | data, error |
+| validate | `comment-body-nonempty` | SHALL reject a Comment whose body is empty or consists only of whitespace. | data, error |
+| attach | `comment-id-unique` | SHALL assign a unique identifier to each created Comment. | data |
+| write | `write-session` | SHALL write the current Request to `.burrow/request.json` after creation and after each Comment is attached. | data |
 
 ---
 
@@ -120,6 +120,58 @@ flowchart TD
 | input | `add-invocation` | SHALL be invoked as `burrow c`. | interface |
 | args | `add-usage` | SHALL exit with `EX_USAGE` if any argument is malformed or missing. | error |
 | session | `add-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`. | error |
+
+---
+
+#### SCN-RESPONSE: Agent response is loaded and validated against the current request
+
+```mermaid
+flowchart TD
+    request([Request]) --> load[Load and validate]
+    input([response.json]) --> load
+    load --> valid{Valid?}
+    valid -- no --> error([Error])
+    valid -- yes --> response([Response])
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| load | `load-response` | SHALL reconstruct a Response from a JSON file, preserving all fields and Replies. | data |
+| load | `response-request-id` | SHALL record the originating Request id on the Response. | data |
+| load | `response-created-at` | SHALL record the agent's creation timestamp on the Response. | data |
+| load | `response-agent-metadata` | SHALL record agent metadata (at minimum: name and version) on the Response. | data |
+| load | `reply-status-valid` | SHALL reject a Reply whose status is not one of: `done`, `partial`, `refused`, `blocked`. | data, error |
+| load | `reply-body-nonempty` | SHALL reject a Reply whose body is empty or consists only of whitespace. | data, error |
+| load | `validate-request-id-match` | SHALL reject a Response whose `request_id` does not match the id of the current Request. | data, error |
+| load | `validate-all-comments-addressed` | SHALL reject a Response that does not include a Reply for every Comment in the Request. | data, error |
+| load | `validate-no-unknown-replies` | SHALL reject a Response that includes a Reply whose Comment id is not present in the Request. | data, error |
+
+---
+
+#### SCN-CLI-VALIDATE: User validates a response against the current session
+
+```mermaid
+flowchart TD
+    input([burrow validate response.json?])
+    --> session{.burrow/request.json exists?}
+    session -- no --> noinput([EX_NOINPUT])
+    session -- yes --> has_response{response.json provided?}
+    has_response -- no --> show_request[Show request summary]
+    --> ok([EX_OK])
+    has_response -- yes --> load[[SCN-RESPONSE]]
+    --> validate[[SCN-VALIDATE]]
+    --> valid{Valid?}
+    valid -- no --> dataerr([EX_DATAERR])
+    valid -- yes --> show_summary[Show validation summary]
+    --> ok2([EX_OK])
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| input | `validate-invocation` | SHALL be invoked as `burrow validate`. | interface |
+| input | `validate-response-optional` | SHALL accept an optional path to a response JSON file. | interface |
+| session | `validate-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`. | error |
+| validate | `validate-dataerr` | SHALL exit with `EX_DATAERR` if the Response fails validation against the Request. | error |
 
 ---
 
