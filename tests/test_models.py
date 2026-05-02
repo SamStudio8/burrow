@@ -12,7 +12,9 @@ def test_comment_rejects_invalid_status():
 
 @pytest.mark.rule("reply-todo-paired")
 @pytest.mark.parametrize("kwargs", [
+    # reply present but status is still todo
     {"status": "todo", "reply": "looks good"},
+    # status is done but no reply provided
     {"status": "done", "reply": None},
 ])
 def test_comment_rejects_mismatched_reply_and_status(kwargs):
@@ -122,6 +124,24 @@ def test_load_reconstructs_response(tmp_path, example_request, example_response)
     assert len(response.comments) == len(example_response["comments"])
     assert str(response.comments[0].id) == example_response["comments"][0]["id"]
     assert response.comments[0].reply == example_response["comments"][0]["reply"]
+
+
+@pytest.mark.rule("validate-all-comments-addressed")
+@pytest.mark.parametrize("mutate", [
+    # response is missing one of the two comments from the request
+    lambda r: r.update({"comments": r["comments"][:1]}),
+    # first comment is still unaddressed (status todo, no reply)
+    lambda r: r["comments"][0].update({"status": "todo", "reply": None}),
+])
+def test_response_rejects_unaddressed_comments(tmp_path, example_request, example_response, mutate):
+    (tmp_path / ".burrow").mkdir()
+    (tmp_path / ".burrow" / "request.json").write_text(json.dumps(example_request))
+    request = Request.load(tmp_path)
+    mutate(example_response)
+    path = tmp_path / "response.json"
+    path.write_text(json.dumps(example_response))
+    with pytest.raises(ValueError):
+        Response.load(path, request)
 
 
 @pytest.mark.rule("validate-request-id-match")

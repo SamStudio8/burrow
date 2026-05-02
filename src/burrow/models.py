@@ -84,13 +84,21 @@ class Response(Document):
         request_id = UUID(data["request_id"])
         if request_id != request.id:
             raise ValueError(f"response request_id {request_id} does not match current request {request.id}")
+        comments = cls._comments_from_data(data)
+        request_ids = {c.id for c in request.comments}
+        response_ids = {c.id for c in comments}
+        missing = request_ids - response_ids
+        if missing:
+            raise ValueError(f"response is missing replies for comments: {missing}")
+        if any(c.status == Status.TODO for c in comments):
+            raise ValueError("response contains comments with status todo")
         return cls(
             id=UUID(data["id"]),
             request_id=request_id,
             created_at=datetime.fromisoformat(data["created_at"]),
             summary=data["summary"],
             agent_metadata=data["agent_metadata"],
-            comments=cls._comments_from_data(data),
+            comments=comments,
         )
 
 
