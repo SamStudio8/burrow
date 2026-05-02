@@ -60,6 +60,17 @@ class HunkHeader(Static):
     """
 
 
+class DiffLine(Static):
+    DEFAULT_CSS = """
+    DiffLine {
+        height: 1;
+    }
+    DiffLine.selected {
+        background: $accent 30%;
+    }
+    """
+
+
 class HunkWidget(Static):
     DEFAULT_CSS = """
     HunkWidget {
@@ -86,12 +97,8 @@ class HunkWidget(Static):
         end = hunk.target_start + hunk.target_length - 1
         label = f"{hunk.file}  ·  {hunk.target_start}–{end}"
         yield HunkHeader(label, id=f"hunk-{self._index}-header")
-        content = Text()
         for i, line in enumerate(hunk.lines):
-            if i > 0:
-                content.append("\n")
-            content.append_text(colour_line(line.rstrip("\n")))
-        yield Static(content)
+            yield DiffLine(colour_line(line.rstrip("\n")), id=f"hunk-{self._index}-line-{i}")
 
 
 class BurrowHeader(Static):
@@ -140,12 +147,28 @@ class BurrowApp(App):
 
     def on_mount(self):
         self._update_highlight(0)
+        self._update_line_highlight(0)
 
-    def watch_selected_hunk(self, new):
+    def watch_selected_hunk(self, old, new):
+        if self.hunks:
+            for i in range(len(self.hunks[old].lines)):
+                self.query_one(f"#hunk-{old}-line-{i}").remove_class("selected")
         self.selected_line = 0
         self._update_highlight(new)
         if self.hunks:
             self.query_one(f"#hunk-{new}").scroll_visible()
+
+    def watch_selected_line(self, new):
+        self._update_line_highlight(new)
+
+    def _update_line_highlight(self, index):
+        h = self.selected_hunk
+        if not self.hunks:
+            return
+        for i in range(len(self.hunks[h].lines)):
+            widget = self.query_one(f"#hunk-{h}-line-{i}")
+            widget.set_class(i == index, "selected")
+        self.query_one(f"#hunk-{h}-line-{index}").scroll_visible()
 
     def action_next_line(self):
         if self.hunks:

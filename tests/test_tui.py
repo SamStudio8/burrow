@@ -144,6 +144,29 @@ async def test_line_nav_clamps_at_hunk_bounds(tmp_path):
             assert app.selected_line == len(app.hunks[0].lines) - 1
 
 
+@pytest.mark.rule("diff-nav-line-scroll")
+async def test_line_navigation_scrolls_line_into_view(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            line_widget = app.screen.query_one("#hunk-0-line-1")
+            assert "selected" in line_widget.classes
+
+
+@pytest.mark.rule("diff-nav-hunk-clears-line")
+async def test_hunk_change_clears_previous_line_selection(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            await pilot.press("j")
+            assert "selected" in app.screen.query_one("#hunk-0-line-2").classes
+            await pilot.press("]")
+            assert "selected" not in app.screen.query_one("#hunk-0-line-2").classes
+            assert "selected" in app.screen.query_one("#hunk-1-line-0").classes
+
+
 @pytest.mark.rule("diff-nav-line")
 async def test_line_resets_on_hunk_change(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):

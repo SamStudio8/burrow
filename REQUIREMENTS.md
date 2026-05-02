@@ -260,6 +260,8 @@ flowchart TD
 | hunks | `diff-line-colour` | SHALL display added lines (prefixed with `+`) and removed lines (prefixed with `-`) each in a distinct colour. | usability |
 | nav | `diff-nav-hunk-highlight` | SHALL visually indicate the currently selected hunk. | usability |
 | nav | `diff-nav-line` | SHALL support line-by-line navigation within a hunk. | usability |
+| nav | `diff-nav-line-scroll` | SHALL scroll the viewport to keep the selected line visible during line navigation. | usability |
+| nav | `diff-nav-hunk-clears-line` | SHALL clear the line selection from the previous hunk when navigating to a new hunk. | usability |
 
 ---
 
