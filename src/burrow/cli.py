@@ -60,6 +60,7 @@ def main():
     add_parser.set_defaults(func=cmd_add)
 
     validate_parser = subparsers.add_parser("validate")
+    validate_parser.add_argument("response", nargs="?", default=None)
     validate_parser.set_defaults(func=cmd_validate)
 
     args = parser.parse_args()

@@ -60,6 +60,19 @@ def test_validate_is_valid_subcommand(tmp_path, monkeypatch):
         main()
 
 
+@pytest.mark.rule("validate-response-optional")
+@pytest.mark.parametrize("argv", [
+    ["burrow", "validate"],
+    ["burrow", "validate", "response.json"],
+])
+def test_validate_accepts_optional_response_path(tmp_path, monkeypatch, argv):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "init"]):
+        main()
+    with patch("sys.argv", argv):
+        main()
+
+
 @pytest.mark.rule("validate-noinput")
 def test_validate_fails_with_no_session(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
