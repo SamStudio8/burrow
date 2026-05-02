@@ -283,6 +283,49 @@ async def test_compose_grows_with_content(tmp_path):
             assert widget.size.height > initial_height
 
 
+@pytest.mark.rule("comment-compose-submit")
+async def test_ctrl_enter_submits_and_removes_compose(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            await pilot.press("#")
+            await pilot.press("h", "i")
+            await pilot.press("ctrl+j")
+            assert len(app.screen.query("ComposeWidget")) == 0
+            assert len(app.request.comments) == 1
+            assert app.request.comments[0].body == "hi"
+
+
+@pytest.mark.rule("comment-submitted-inline")
+async def test_submitted_comment_renders_inline(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            await pilot.press("#")
+            await pilot.press("h", "i")
+            await pilot.press("ctrl+j")
+            blocks = app.screen.query("CommentBlock")
+            assert len(blocks) == 1
+            assert "hi" in str(blocks.first().render())
+
+
+@pytest.mark.rule("comment-submitted-inline")
+async def test_commented_lines_have_dim_highlight(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            await pilot.press("#")
+            await pilot.press("h", "i")
+            await pilot.press("ctrl+j")
+            assert "commented" in app.screen.query_one("#hunk-0-line-1").classes
+
+
 @pytest.mark.rule("comment-compose-cancel")
 async def test_escape_cancels_compose(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):

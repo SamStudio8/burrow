@@ -75,6 +75,9 @@ class DiffLine(Static):
     DiffLine.selected {
         background: $accent 30%;
     }
+    DiffLine.commented {
+        background: $accent 10%;
+    }
     """
 
 
@@ -121,6 +124,12 @@ class ComposeWidget(TextArea):
     }
     """
 
+    def __init__(self, hunk_index, first_line_index, last_line_index):
+        super().__init__()
+        self._hunk_index = hunk_index
+        self._first_line_index = first_line_index
+        self._last_line_index = last_line_index
+
     def on_mount(self):
         self.show_line_numbers = False
         self.focus()
@@ -136,6 +145,25 @@ class ComposeWidget(TextArea):
         elif event.key == "escape":
             event.stop()
             self.app.action_cancel_compose()
+
+
+class CommentBlock(Static):
+    DEFAULT_CSS = """
+    CommentBlock {
+        border-left: thick $accent 40%;
+        padding: 0 1;
+        color: $text-muted;
+        height: auto;
+        margin-bottom: 1;
+    }
+    """
+
+    def __init__(self, comment):
+        super().__init__()
+        self._comment = comment
+
+    def render(self):
+        return self._comment.body
 
 
 class BurrowHeader(Static):
@@ -282,7 +310,12 @@ class BurrowApp(App):
             last_line_index = self.selected_line
         self.composing = Anchor(file=hunk.file, first_line=first, last_line=last)
         anchor_widget = self.query_one(f"#hunk-{self.selected_hunk}-line-{last_line_index}")
-        self.mount(ComposeWidget(), after=anchor_widget)
+        compose = ComposeWidget(
+            hunk_index=self.selected_hunk,
+            first_line_index=min(self.selected_line, last_line_index),
+            last_line_index=last_line_index,
+        )
+        self.mount(compose, after=anchor_widget)
 
     def action_cancel_compose(self):
         widgets = self.screen.query(ComposeWidget)
@@ -293,6 +326,21 @@ class BurrowApp(App):
 
     def action_submit_compose(self):
         widgets = self.screen.query(ComposeWidget)
-        if widgets:
-            widgets.first().remove()
-            self.query_one("#diff-view").focus()
+        if not widgets:
+            return
+        compose = widgets.first()
+        body = compose.text.strip()
+        if body and self.composing is not None:
+            comment = self.request.add_comment(
+                file=self.composing.file,
+                first_line=self.composing.first_line,
+                last_line=self.composing.last_line,
+                body=body,
+            )
+            self.request.save()
+            for i in range(compose._first_line_index, compose._last_line_index + 1):
+                self.query_one(f"#hunk-{compose._hunk_index}-line-{i}").add_class("commented")
+            self.mount(CommentBlock(comment), after=compose)
+        compose.remove()
+        self.composing = None
+        self.query_one("#diff-view").focus()
