@@ -113,6 +113,16 @@ def test_send_is_valid_subcommand(session, capsys):
         main()
 
 
+@pytest.mark.rule("send-noinput")
+def test_send_fails_with_no_session(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "send"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == EX_NOINPUT
+    assert "No session found" in capsys.readouterr().err
+
+
 @pytest.mark.rule("init-excantcreat")
 def test_init_fails_if_session_exists(session, capsys):
     capsys.readouterr()
