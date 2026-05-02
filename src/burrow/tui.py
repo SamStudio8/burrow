@@ -1,6 +1,19 @@
+import subprocess
+from pathlib import Path
+
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Static
+
+
+def get_diff(repo_root: Path) -> str:
+    result = subprocess.run(
+        ["git", "diff", "HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout
 
 
 class BurrowHeader(Static):
