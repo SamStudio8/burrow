@@ -256,6 +256,7 @@ flowchart TD
 | hunks | `diff-hunks` | SHALL display all hunks grouped by file. | interface, usability |
 | nav | `diff-nav-next-hunk` | SHALL support navigating to the next hunk. | usability |
 | nav | `diff-nav-prev-hunk` | SHALL support navigating to the previous hunk. | usability |
+| nav | `diff-nav-hunk-highlight` | SHALL visually indicate the currently selected hunk. | usability |
 | nav | `diff-nav-line` | SHALL support line-by-line navigation within a hunk. | usability |
 
 ---

@@ -76,10 +76,11 @@ async def test_diff_hunks_displayed_in_tui(tmp_path, monkeypatch):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=request)
         async with app.run_test() as pilot:
-            text = str(app.screen.query_one("#diff-view").render())
+            text = str(app.screen.query_one("#hunk-0").render())
             assert "foo.py" in text
             assert "+line2" in text
-            assert "-lineB" in text
+            text1 = str(app.screen.query_one("#hunk-1").render())
+            assert "-lineB" in text1
 
 
 @pytest.mark.rule("diff-nav-next-hunk")
@@ -122,3 +123,17 @@ async def test_prev_hunk_clamps_at_start(tmp_path):
         async with app.run_test() as pilot:
             await pilot.press("[")
             assert app.selected_hunk == 0
+
+
+@pytest.mark.rule("diff-nav-hunk-highlight")
+async def test_selected_hunk_is_highlighted(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            hunk0 = app.screen.query_one("#hunk-0")
+            hunk1 = app.screen.query_one("#hunk-1")
+            assert "selected" in hunk0.classes
+            assert "selected" not in hunk1.classes
+            await pilot.press("]")
+            assert "selected" not in hunk0.classes
+            assert "selected" in hunk1.classes
