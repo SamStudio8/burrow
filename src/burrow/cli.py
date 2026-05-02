@@ -1,5 +1,6 @@
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 from burrow.models import Request, Response, _serialise
@@ -13,21 +14,37 @@ EX_NOINPUT = 66
 EX_USAGE = 64
 
 
+def get_repo_root(cwd=None):
+    if cwd is None:
+        cwd = Path.cwd()
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        sys.stderr.write("Not inside a git repository\n")
+        sys.exit(EX_NOINPUT)
+    return Path(result.stdout.strip()).resolve()
+
+
 def _current_request(ex_on_noinput=False):
-    session = Path.cwd() / ".burrow" / "request.json"
+    repo_root = get_repo_root()
+    session = repo_root / ".burrow" / "request.json"
     if not session.exists():
         if ex_on_noinput:
             sys.stderr.write("No session found — run 'burrow start' first\n")
             sys.exit(EX_NOINPUT)
         return None
-    return Request.load(Path.cwd())
+    return Request.load(repo_root)
 
 
 def cmd_start(args):
     if _current_request() is not None:
         sys.stderr.write("A session already exists at .burrow/request.json\n")
         sys.exit(EX_CANTCREAT)
-    request = Request(summary=args.summary or "", repo_root=Path.cwd())
+    request = Request(summary=args.summary or "", repo_root=get_repo_root())
     request.save()
     sys.stderr.write("Session started at .burrow/request.json\n")
 
@@ -53,8 +70,9 @@ def cmd_add(args):
 
 
 def cmd_end(args):
+    repo_root = get_repo_root()
     _current_request(ex_on_noinput=True)
-    burrow_dir = Path.cwd() / ".burrow"
+    burrow_dir = repo_root / ".burrow"
     (burrow_dir / "request.json").unlink()
     response = burrow_dir / "response.json"
     if response.exists():
@@ -102,6 +120,8 @@ def main():
     if hasattr(args, "func"):
         args.func(args)
     else:
-        if _current_request() is None:
-            Request(summary="", repo_root=Path.cwd()).save()
-        BurrowApp(repo_root=Path.cwd()).run()
+        request = _current_request()
+        if request is None:
+            request = Request(summary="", repo_root=get_repo_root())
+            request.save()
+        BurrowApp(request=request).run()

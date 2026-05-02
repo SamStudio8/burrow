@@ -1,8 +1,24 @@
 import json
 import pytest
 from unittest.mock import patch
-from burrow.cli import main, EX_CANTCREAT, EX_DATAERR, EX_NOINPUT, EX_USAGE
+from burrow.cli import main, get_repo_root, EX_CANTCREAT, EX_DATAERR, EX_NOINPUT, EX_USAGE
 from burrow.models import Request
+
+
+@pytest.mark.rule("repo-root-git")
+def test_get_repo_root_returns_git_root(tmp_path):
+    import subprocess
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    result = get_repo_root(tmp_path)
+    assert result == tmp_path.resolve()
+
+
+@pytest.mark.rule("repo-root-noinput")
+def test_get_repo_root_exits_outside_git_repo(tmp_path, capsys):
+    with pytest.raises(SystemExit) as exc:
+        get_repo_root(tmp_path)
+    assert exc.value.code == EX_NOINPUT
+    assert "git repository" in capsys.readouterr().err
 
 
 @pytest.mark.rule("tui-invocation")
@@ -14,17 +30,15 @@ def test_tui_opens_with_no_subcommand(session):
 
 
 @pytest.mark.rule("tui-implicit-start")
-def test_tui_creates_session_if_none_exists(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+def test_tui_creates_session_if_none_exists(git_repo):
     with patch("sys.argv", ["burrow"]):
         with patch("burrow.tui.BurrowApp.run"):
             main()
-    assert (tmp_path / ".burrow" / "request.json").exists()
+    assert (git_repo / ".burrow" / "request.json").exists()
 
 
 @pytest.mark.rule("start-invocation")
-def test_start_is_valid_subcommand(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
+def test_start_is_valid_subcommand(git_repo, capsys):
     with patch("sys.argv", ["burrow", "start"]):
         main()
     assert "Session started at .burrow/request.json" in capsys.readouterr().err
@@ -35,8 +49,7 @@ def test_start_is_valid_subcommand(tmp_path, monkeypatch, capsys):
     ["burrow", "start", "my review summary"],
     ["burrow", "start"],
 ])
-def test_start_accepts_optional_summary(tmp_path, monkeypatch, argv):
-    monkeypatch.chdir(tmp_path)
+def test_start_accepts_optional_summary(git_repo, argv):
     with patch("sys.argv", argv):
         main()
 
@@ -58,8 +71,7 @@ def test_add_fails_with_missing_args(tmp_path, monkeypatch):
 
 
 @pytest.mark.rule("add-noinput")
-def test_add_fails_with_no_session(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
+def test_add_fails_with_no_session(git_repo, capsys):
     with patch("sys.argv", ["burrow", "c", "foo.py", "1", "1", "a comment"]):
         with pytest.raises(SystemExit) as exc:
             main()
@@ -115,8 +127,7 @@ def test_validate_fails_with_invalid_response(session, capsys):
 
 
 @pytest.mark.rule("validate-noinput")
-def test_validate_fails_with_no_session(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
+def test_validate_fails_with_no_session(git_repo, capsys):
     with patch("sys.argv", ["burrow", "validate"]):
         with pytest.raises(SystemExit) as exc:
             main()
@@ -131,8 +142,7 @@ def test_send_is_valid_subcommand(session, capsys):
 
 
 @pytest.mark.rule("send-noinput")
-def test_send_fails_with_no_session(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
+def test_send_fails_with_no_session(git_repo, capsys):
     with patch("sys.argv", ["burrow", "send"]):
         with pytest.raises(SystemExit) as exc:
             main()
@@ -157,8 +167,7 @@ def test_end_is_valid_subcommand(session):
 
 
 @pytest.mark.rule("end-noinput")
-def test_end_fails_with_no_session(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
+def test_end_fails_with_no_session(git_repo, capsys):
     with patch("sys.argv", ["burrow", "end"]):
         with pytest.raises(SystemExit) as exc:
             main()

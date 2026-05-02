@@ -71,6 +71,8 @@ flowchart TD
 | create_request | `request-id-unique` | SHALL assign a unique identifier to each created Request. | data |
 | create_request | `request-created-at` | SHALL record the creation timestamp when a Request is created. | data |
 | create_request | `request-repo-root` | SHALL record the working directory at the time of creation as the repo root. | data |
+| create_request | `repo-root-git` | SHALL determine the repository root by invoking `git rev-parse --show-toplevel` from the current working directory. | data |
+| create_request | `repo-root-noinput` | SHALL exit with `EX_NOINPUT` if the current working directory is not inside a git repository. | error |
 | load | `load-session` | SHALL reconstruct a Request from `.burrow/request.json`, preserving all fields and Comments. | data |
 | validate | `anchor-file-exists` | SHALL reject a Comment whose file path does not resolve to an existing file within the repo. | data, error |
 | validate | `anchor-zero-paired` | SHALL reject a Comment where exactly one of `first_line` or `last_line` is zero. | data, error |

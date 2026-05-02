@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import patch
+from burrow.models import Request
 from burrow.tui import get_diff, parse_diff, BurrowApp
 
 
@@ -71,8 +72,9 @@ def test_parse_diff_hunk_has_header():
 @pytest.mark.rule("diff-hunks")
 async def test_diff_hunks_displayed_in_tui(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    request = Request(summary="", repo_root=tmp_path)
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        app = BurrowApp(repo_root=tmp_path)
+        app = BurrowApp(request=request)
         async with app.run_test() as pilot:
             text = str(app.screen.query_one("#diff-view").render())
             assert "foo.py" in text

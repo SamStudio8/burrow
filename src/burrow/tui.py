@@ -64,10 +64,10 @@ class BurrowApp(App):
         Binding("ctrl+c", "quit", "Quit"),
     ]
 
-    def __init__(self, repo_root):
+    def __init__(self, request):
         super().__init__()
-        self.repo_root = repo_root
-        self.hunks = parse_diff(get_diff(repo_root))
+        self.request = request
+        self.hunks = parse_diff(get_diff(request.repo_root))
 
     def compose(self):
         yield BurrowHeader()

@@ -8,11 +8,17 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
-def session(tmp_path, monkeypatch):
+def git_repo(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("burrow.cli.get_repo_root", lambda cwd=None: tmp_path)
+    return tmp_path
+
+
+@pytest.fixture
+def session(git_repo):
     with patch("sys.argv", ["burrow", "start"]):
         main()
-    return tmp_path
+    return git_repo
 
 
 @pytest.fixture
