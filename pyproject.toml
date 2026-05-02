@@ -3,7 +3,9 @@ name = "burrow"
 version = "0.1.0"
 description = "Terminal review tool for coding agent diffs"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "textual>=8.2.5",
+]
 
 [project.scripts]
 burrow = "burrow.cli:main"

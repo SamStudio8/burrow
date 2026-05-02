@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from burrow.models import Request, Response, _serialise
 from burrow.preamble import PREAMBLE
+from burrow.tui import BurrowApp
 
 # did you know, you cant get these on windows
 EX_CANTCREAT = 73
@@ -100,3 +101,5 @@ def main():
     args = parser.parse_args()
     if hasattr(args, "func"):
         args.func(args)
+    else:
+        BurrowApp().run()

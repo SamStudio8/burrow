@@ -5,6 +5,14 @@ from burrow.cli import main, EX_CANTCREAT, EX_DATAERR, EX_NOINPUT, EX_USAGE
 from burrow.models import Request
 
 
+@pytest.mark.rule("tui-invocation")
+def test_tui_opens_with_no_subcommand(session):
+    with patch("sys.argv", ["burrow"]):
+        with patch("burrow.tui.BurrowApp.run") as mock_run:
+            main()
+    mock_run.assert_called_once()
+
+
 @pytest.mark.rule("start-invocation")
 def test_start_is_valid_subcommand(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
