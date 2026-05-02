@@ -107,6 +107,12 @@ def test_validate_fails_with_no_session(tmp_path, monkeypatch, capsys):
     assert "No session found" in capsys.readouterr().err
 
 
+@pytest.mark.rule("send-invocation")
+def test_send_is_valid_subcommand(session, capsys):
+    with patch("sys.argv", ["burrow", "send"]):
+        main()
+
+
 @pytest.mark.rule("init-excantcreat")
 def test_init_fails_if_session_exists(session, capsys):
     capsys.readouterr()

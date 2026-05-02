@@ -175,6 +175,25 @@ flowchart TD
 
 ---
 
+#### SCN-CLI-SEND: User dispatches the current request to an agent
+
+```mermaid
+flowchart TD
+    input([burrow send])
+    --> session{.burrow/request.json exists?}
+    session -- no --> noinput([EX_NOINPUT])
+    session -- yes --> emit[Emit preamble and request JSON to stdout]
+    --> ok([EX_OK])
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| input | `send-invocation` | SHALL be invoked as `burrow send`. | interface |
+| session | `send-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`. | error |
+| emit | `send-stdout` | SHALL write the dispatch preamble followed by the Request JSON to stdout. | interface |
+
+---
+
 ## Tag Glossary
 
 ### Standard tags

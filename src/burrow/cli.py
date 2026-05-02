@@ -49,6 +49,10 @@ def cmd_add(args):
     request.save()
 
 
+def cmd_send(args):
+    request = _current_request(ex_on_noinput=True)
+
+
 class BurrowParser(argparse.ArgumentParser):
     def error(self, message):
         sys.stderr.write(f"error: {message}\n")
@@ -73,6 +77,9 @@ def main():
     validate_parser = subparsers.add_parser("validate")
     validate_parser.add_argument("response", nargs="?", default=None)
     validate_parser.set_defaults(func=cmd_validate)
+
+    send_parser = subparsers.add_parser("send")
+    send_parser.set_defaults(func=cmd_send)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
