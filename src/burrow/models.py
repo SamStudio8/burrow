@@ -92,6 +92,9 @@ class Response(Document):
             raise ValueError(f"response is missing replies for comments: {missing}")
         if any(c.status == Status.TODO for c in comments):
             raise ValueError("response contains comments with status todo")
+        unknown = response_ids - request_ids
+        if unknown:
+            raise ValueError(f"response contains comments not in request: {unknown}")
         return cls(
             id=UUID(data["id"]),
             request_id=request_id,

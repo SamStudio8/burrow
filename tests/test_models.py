@@ -144,6 +144,27 @@ def test_response_rejects_unaddressed_comments(tmp_path, example_request, exampl
         Response.load(path, request)
 
 
+@pytest.mark.rule("validate-no-unknown-comments")
+def test_response_rejects_unknown_comments(tmp_path, example_request, example_response):
+    (tmp_path / ".burrow").mkdir()
+    (tmp_path / ".burrow" / "request.json").write_text(json.dumps(example_request))
+    request = Request.load(tmp_path)
+    # inject a comment the request never had
+    example_response["comments"].append({
+        "id": "00000000-0000-0000-0000-000000000099",
+        "file": "src/burrow/models.py",
+        "first_line": 1,
+        "last_line": 1,
+        "body": "mystery comment",
+        "status": "done",
+        "reply": "handled",
+    })
+    path = tmp_path / "response.json"
+    path.write_text(json.dumps(example_response))
+    with pytest.raises(ValueError):
+        Response.load(path, request)
+
+
 @pytest.mark.rule("validate-request-id-match")
 def test_response_rejects_mismatched_request_id(tmp_path, example_response):
     request = Request(summary="different request", repo_root=tmp_path)
