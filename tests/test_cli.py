@@ -51,6 +51,15 @@ def test_add_fails_with_no_session(tmp_path, monkeypatch, capsys):
     assert "session" in capsys.readouterr().err
 
 
+@pytest.mark.rule("validate-invocation")
+def test_validate_is_valid_subcommand(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "init"]):
+        main()
+    with patch("sys.argv", ["burrow", "validate"]):
+        main()
+
+
 @pytest.mark.rule("init-excantcreat")
 def test_init_fails_if_session_exists(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)

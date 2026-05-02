@@ -1,5 +1,4 @@
 import argparse
-import os
 import sys
 from pathlib import Path
 from burrow.models import Request
@@ -18,6 +17,10 @@ def cmd_init(args):
     request = Request(summary=args.summary or "", repo_root=Path.cwd())
     request.save()
     sys.stderr.write("Session initialized at .burrow/request.json\n")
+
+
+def cmd_validate(args):
+    pass
 
 
 def cmd_add(args):
@@ -50,6 +53,9 @@ def main():
     add_parser.add_argument("last_line")
     add_parser.add_argument("body")
     add_parser.set_defaults(func=cmd_add)
+
+    validate_parser = subparsers.add_parser("validate")
+    validate_parser.set_defaults(func=cmd_validate)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
