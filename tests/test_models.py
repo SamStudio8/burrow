@@ -10,6 +10,16 @@ def test_comment_rejects_invalid_status():
         Comment(file="foo.py", first_line=1, last_line=1, body="a comment", status="hoot")
 
 
+@pytest.mark.rule("reply-todo-paired")
+@pytest.mark.parametrize("kwargs", [
+    {"status": "todo", "reply": "looks good"},
+    {"status": "done", "reply": None},
+])
+def test_comment_rejects_mismatched_reply_and_status(kwargs):
+    with pytest.raises(ValueError):
+        Comment(file="foo.py", first_line=1, last_line=1, body="a comment", **kwargs)
+
+
 @pytest.mark.rule("comment-body-nonempty")
 def test_comment_rejects_whitespace_body():
     with pytest.raises(ValueError):

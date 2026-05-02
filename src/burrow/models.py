@@ -44,6 +44,8 @@ class Comment:
             raise ValueError("first_line and last_line must both be zero or neither")
         if self.last_line < self.first_line:
             raise ValueError("last_line must not be less than first_line")
+        if (self.status == Status.TODO) != (self.reply is None):
+            raise ValueError("reply must be None if status is todo")
 
 
 @dataclass
