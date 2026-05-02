@@ -80,3 +80,45 @@ async def test_diff_hunks_displayed_in_tui(tmp_path, monkeypatch):
             assert "foo.py" in text
             assert "+line2" in text
             assert "-lineB" in text
+
+
+@pytest.mark.rule("diff-nav-next-hunk")
+async def test_next_hunk_advances_selection(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            assert app.selected_hunk == 0
+            await pilot.press("]")
+            assert app.selected_hunk == 1
+
+
+@pytest.mark.rule("diff-nav-prev-hunk")
+async def test_prev_hunk_retreats_selection(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("]")
+            await pilot.press("]")
+            assert app.selected_hunk == 2
+            await pilot.press("[")
+            assert app.selected_hunk == 1
+
+
+@pytest.mark.rule("diff-nav-next-hunk")
+async def test_next_hunk_clamps_at_end(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("]")
+            await pilot.press("]")
+            await pilot.press("]")
+            assert app.selected_hunk == 2
+
+
+@pytest.mark.rule("diff-nav-prev-hunk")
+async def test_prev_hunk_clamps_at_start(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("[")
+            assert app.selected_hunk == 0

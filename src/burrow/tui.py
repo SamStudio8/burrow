@@ -62,12 +62,21 @@ class BurrowApp(App):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("ctrl+c", "quit", "Quit"),
+        Binding("]", "next_hunk", "Next hunk"),
+        Binding("[", "prev_hunk", "Prev hunk"),
     ]
 
     def __init__(self, request):
         super().__init__()
         self.request = request
         self.hunks = parse_diff(get_diff(request.repo_root))
+        self.selected_hunk = 0
+
+    def action_next_hunk(self):
+        self.selected_hunk = min(self.selected_hunk + 1, len(self.hunks) - 1)
+
+    def action_prev_hunk(self):
+        self.selected_hunk = max(self.selected_hunk - 1, 0)
 
     def compose(self):
         yield BurrowHeader()
