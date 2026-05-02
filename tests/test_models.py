@@ -108,10 +108,13 @@ def test_load_reconstructs_request(tmp_path, example_request):
 
 
 @pytest.mark.rule("load-response")
-def test_load_reconstructs_response(tmp_path, example_response):
+def test_load_reconstructs_response(tmp_path, example_request, example_response):
+    (tmp_path / ".burrow").mkdir()
+    (tmp_path / ".burrow" / "request.json").write_text(json.dumps(example_request))
+    request = Request.load(tmp_path)
     path = tmp_path / "response.json"
     path.write_text(json.dumps(example_response))
-    response = Response.load(path)
+    response = Response.load(path, request)
     assert str(response.id) == example_response["id"]
     assert str(response.request_id) == example_response["request_id"]
     assert response.summary == example_response["summary"]
@@ -119,6 +122,15 @@ def test_load_reconstructs_response(tmp_path, example_response):
     assert len(response.comments) == len(example_response["comments"])
     assert str(response.comments[0].id) == example_response["comments"][0]["id"]
     assert response.comments[0].reply == example_response["comments"][0]["reply"]
+
+
+@pytest.mark.rule("validate-request-id-match")
+def test_response_rejects_mismatched_request_id(tmp_path, example_response):
+    request = Request(summary="different request", repo_root=tmp_path)
+    path = tmp_path / "response.json"
+    path.write_text(json.dumps(example_response))
+    with pytest.raises(ValueError):
+        Response.load(path, request)
 
 
 @pytest.mark.rule("write-session")

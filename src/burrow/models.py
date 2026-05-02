@@ -79,11 +79,14 @@ class Response(Document):
     agent_metadata: dict
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, request):
         data = json.loads(Path(path).read_text())
+        request_id = UUID(data["request_id"])
+        if request_id != request.id:
+            raise ValueError(f"response request_id {request_id} does not match current request {request.id}")
         return cls(
             id=UUID(data["id"]),
-            request_id=UUID(data["request_id"]),
+            request_id=request_id,
             created_at=datetime.fromisoformat(data["created_at"]),
             summary=data["summary"],
             agent_metadata=data["agent_metadata"],
