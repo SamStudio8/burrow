@@ -1,8 +1,18 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 import pytest
+from burrow.cli import main
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def session(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "init"]):
+        main()
+    return tmp_path
 
 
 @pytest.fixture

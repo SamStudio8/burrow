@@ -25,11 +25,8 @@ def test_init_accepts_optional_summary(tmp_path, monkeypatch, argv):
 
 
 @pytest.mark.rule("add-invocation")
-def test_add_is_valid_subcommand(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "foo.py").write_text("hello\n")
-    with patch("sys.argv", ["burrow", "init"]):
-        main()
+def test_add_is_valid_subcommand(session):
+    (session / "foo.py").write_text("hello\n")
     with patch("sys.argv", ["burrow", "c", "foo.py", "1", "1", "a comment"]):
         main()
 
@@ -54,10 +51,7 @@ def test_add_fails_with_no_session(tmp_path, monkeypatch, capsys):
 
 
 @pytest.mark.rule("validate-invocation")
-def test_validate_is_valid_subcommand(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    with patch("sys.argv", ["burrow", "init"]):
-        main()
+def test_validate_is_valid_subcommand(session):
     with patch("sys.argv", ["burrow", "validate"]):
         main()
 
@@ -67,13 +61,10 @@ def test_validate_is_valid_subcommand(tmp_path, monkeypatch):
     ["burrow", "validate"],
     ["burrow", "validate", "response.json"],
 ])
-def test_validate_accepts_optional_response_path(tmp_path, monkeypatch, argv):
-    monkeypatch.chdir(tmp_path)
-    with patch("sys.argv", ["burrow", "init"]):
-        main()
+def test_validate_accepts_optional_response_path(session, argv):
     if "response.json" in argv:
-        request = Request.load(tmp_path)
-        (tmp_path / "response.json").write_text(json.dumps({
+        request = Request.load(session)
+        (session / "response.json").write_text(json.dumps({
             "id": "a1b2c3d4-0000-0000-0000-000000000001",
             "request_id": str(request.id),
             "created_at": "2026-04-29T21:00:00+00:00",
@@ -86,10 +77,7 @@ def test_validate_accepts_optional_response_path(tmp_path, monkeypatch, argv):
 
 
 @pytest.mark.rule("validate-noinput")
-def test_validate_fails_with_missing_response_file(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    with patch("sys.argv", ["burrow", "init"]):
-        main()
+def test_validate_fails_with_missing_response_file(session, capsys):
     capsys.readouterr()
     with patch("sys.argv", ["burrow", "validate", "response.json"]):
         with pytest.raises(SystemExit) as exc:
@@ -99,13 +87,10 @@ def test_validate_fails_with_missing_response_file(tmp_path, monkeypatch, capsys
 
 
 @pytest.mark.rule("validate-dataerr")
-def test_validate_fails_with_invalid_response(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    with patch("sys.argv", ["burrow", "init"]):
-        main()
+def test_validate_fails_with_invalid_response(session, capsys):
     capsys.readouterr()
     # response.json references a different request_id
-    (tmp_path / "response.json").write_text('{"request_id": "00000000-0000-0000-0000-000000000000"}')
+    (session / "response.json").write_text('{"request_id": "00000000-0000-0000-0000-000000000000"}')
     with patch("sys.argv", ["burrow", "validate", "response.json"]):
         with pytest.raises(SystemExit) as exc:
             main()
@@ -123,10 +108,7 @@ def test_validate_fails_with_no_session(tmp_path, monkeypatch, capsys):
 
 
 @pytest.mark.rule("init-excantcreat")
-def test_init_fails_if_session_exists(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    with patch("sys.argv", ["burrow", "init"]):
-        main()
+def test_init_fails_if_session_exists(session, capsys):
     capsys.readouterr()
     with patch("sys.argv", ["burrow", "init"]):
         with pytest.raises(SystemExit) as exc:
