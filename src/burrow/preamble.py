@@ -14,9 +14,11 @@ The Request is provided as JSON. It contains:
 Your responsibilities:
 1. Read each Comment and make the requested change using whatever tools and skills \
 are available to you.
-2. Write your Response to .burrow/response.json.
-3. Run `burrow validate .burrow/response.json` — fix any errors it reports before \
-you are done.
+2. Run the full test suite and any pre-commit hooks. Fix any failures before \
+proceeding.
+3. Write your Response to .burrow/response.json.
+4. Run `uv run burrow validate .burrow/response.json` — fix any errors it reports \
+before you are done.
 
 Response format (.burrow/response.json):
 {
