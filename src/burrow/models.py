@@ -46,15 +46,54 @@ class Comment:
             raise ValueError("last_line must not be less than first_line")
         if (self.status == Status.TODO) != (self.reply is None):
             raise ValueError("reply must be None if status is todo")
+        if self.reply is not None and not self.reply.strip():
+            raise ValueError("reply must not be empty or whitespace")
 
 
-@dataclass
-class Request:
-    summary: str
-    repo_root: Path
-    comments: list[Comment] = field(default_factory=list)
+@dataclass(kw_only=True)
+class Document:
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    summary: str
+    comments: list[Comment] = field(default_factory=list)
+
+    @staticmethod
+    def _comments_from_data(data):
+        return [
+            Comment(
+                file=c["file"],
+                first_line=c["first_line"],
+                last_line=c["last_line"],
+                body=c["body"],
+                id=UUID(c["id"]),
+                status=c.get("status", Status.TODO),
+                reply=c.get("reply"),
+            )
+            for c in data["comments"]
+        ]
+
+
+@dataclass(kw_only=True)
+class Response(Document):
+    request_id: UUID
+    agent_metadata: dict
+
+    @classmethod
+    def load(cls, path):
+        data = json.loads(Path(path).read_text())
+        return cls(
+            id=UUID(data["id"]),
+            request_id=UUID(data["request_id"]),
+            created_at=datetime.fromisoformat(data["created_at"]),
+            summary=data["summary"],
+            agent_metadata=data["agent_metadata"],
+            comments=cls._comments_from_data(data),
+        )
+
+
+@dataclass(kw_only=True)
+class Request(Document):
+    repo_root: Path
 
     def add_comment(self, file, first_line, last_line, body):
         path = self.repo_root / file
@@ -70,20 +109,10 @@ class Request:
     @classmethod
     def load(cls, repo_root):
         data = json.loads((repo_root / ".burrow" / "request.json").read_text())
-        comments = [
-            Comment(
-                file=c["file"],
-                first_line=c["first_line"],
-                last_line=c["last_line"],
-                body=c["body"],
-                id=UUID(c["id"]),
-            )
-            for c in data["comments"]
-        ]
         return cls(
             summary=data["summary"],
             repo_root=Path(data["repo_root"]),
-            comments=comments,
+            comments=cls._comments_from_data(data),
             id=UUID(data["id"]),
             created_at=datetime.fromisoformat(data["created_at"]),
         )

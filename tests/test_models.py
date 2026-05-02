@@ -1,7 +1,7 @@
 import json
 import pytest
 from datetime import datetime, timezone
-from burrow.models import Comment, Request
+from burrow.models import Comment, Request, Response
 
 
 @pytest.mark.rule("comment-status-valid")
@@ -18,6 +18,12 @@ def test_comment_rejects_invalid_status():
 def test_comment_rejects_mismatched_reply_and_status(kwargs):
     with pytest.raises(ValueError):
         Comment(file="foo.py", first_line=1, last_line=1, body="a comment", **kwargs)
+
+
+@pytest.mark.rule("reply-nonempty")
+def test_comment_rejects_whitespace_reply():
+    with pytest.raises(ValueError):
+        Comment(file="foo.py", first_line=1, last_line=1, body="a comment", status="done", reply="   ")
 
 
 @pytest.mark.rule("comment-body-nonempty")
@@ -99,6 +105,20 @@ def test_load_reconstructs_request(tmp_path, example_request):
     assert len(request.comments) == len(example_request["comments"])
     assert str(request.comments[0].id) == example_request["comments"][0]["id"]
     assert request.comments[0].body == example_request["comments"][0]["body"]
+
+
+@pytest.mark.rule("load-response")
+def test_load_reconstructs_response(tmp_path, example_response):
+    path = tmp_path / "response.json"
+    path.write_text(json.dumps(example_response))
+    response = Response.load(path)
+    assert str(response.id) == example_response["id"]
+    assert str(response.request_id) == example_response["request_id"]
+    assert response.summary == example_response["summary"]
+    assert response.agent_metadata == example_response["agent_metadata"]
+    assert len(response.comments) == len(example_response["comments"])
+    assert str(response.comments[0].id) == example_response["comments"][0]["id"]
+    assert response.comments[0].reply == example_response["comments"][0]["reply"]
 
 
 @pytest.mark.rule("write-session")

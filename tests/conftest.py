@@ -10,6 +10,11 @@ def example_request():
     return json.loads((FIXTURES / "request.json").read_text())
 
 
+@pytest.fixture
+def example_response():
+    return json.loads((FIXTURES / "response.json").read_text())
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--rule",

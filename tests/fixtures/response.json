@@ -1,0 +1,30 @@
+{
+  "id": "a1b2c3d4-0000-0000-0000-000000000001",
+  "request_id": "e70e4af9-ed59-4803-9d9f-1c55146272c8",
+  "created_at": "2026-04-29T21:00:00.000000+00:00",
+  "summary": "Addressed both comments.",
+  "agent_metadata": {
+    "name": "claude-code",
+    "version": "1.0.0"
+  },
+  "comments": [
+    {
+      "id": "6a416909-fdbd-4bd9-aba0-9ff364cf578b",
+      "file": "src/burrow/models.py",
+      "first_line": 1,
+      "last_line": 1,
+      "body": "Consider adding a module docstring.",
+      "status": "done",
+      "reply": "Added a module docstring."
+    },
+    {
+      "id": "4898752c-8eba-491c-a36d-02e6dce82658",
+      "file": "src/burrow/models.py",
+      "first_line": 34,
+      "last_line": 43,
+      "body": "This validation block is getting long - could be a private method.",
+      "status": "refused",
+      "reply": "The block is short enough to remain inline for now."
+    }
+  ]
+}
