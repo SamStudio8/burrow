@@ -1,6 +1,21 @@
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import Footer, Header
+from textual.widgets import Footer, Static
+
+
+class BurrowHeader(Static):
+    DEFAULT_CSS = """
+    BurrowHeader {
+        height: 1;
+        background: $primary;
+        color: $text;
+        padding: 0 1;
+        content-align: left middle;
+    }
+    """
+
+    def render(self) -> str:
+        return "🐇 burrow"
 
 
 class BurrowApp(App):
@@ -11,5 +26,5 @@ class BurrowApp(App):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        yield BurrowHeader()
         yield Footer()
