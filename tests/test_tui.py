@@ -260,6 +260,18 @@ async def test_hash_in_selection_mode_uses_range(tmp_path):
             assert app.composing.first_line != app.composing.last_line
 
 
+@pytest.mark.rule("comment-select-range-cross-hunk")
+async def test_hunk_navigation_discards_selection(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("v")
+            await pilot.press("j")
+            assert app.selecting is not None
+            await pilot.press("]")
+            assert app.selecting is None
+
+
 @pytest.mark.rule("comment-select-range-cancel")
 async def test_v_again_exits_selection_mode(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):

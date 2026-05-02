@@ -2,7 +2,7 @@ import subprocess
 from dataclasses import dataclass
 
 from rich.text import Text
-from textual.app import App, ComposeResult
+from textual.app import App
 from textual.binding import Binding
 from textual.reactive import reactive
 from textual.widgets import Footer, Static
@@ -164,6 +164,7 @@ class BurrowApp(App):
         if self.hunks:
             for i in range(len(self.hunks[old].lines)):
                 self.query_one(f"#hunk-{old}-line-{i}").remove_class("selected")
+        self.selecting = None
         self.selected_line = 0
         self._update_highlight(new)
         if self.hunks:
