@@ -194,6 +194,26 @@ flowchart TD
 
 ---
 
+#### SCN-CLI-DONE: User closes the current session
+
+```mermaid
+flowchart TD
+    input([burrow done])
+    --> session{.burrow/request.json exists?}
+    session -- no --> noinput([EX_NOINPUT])
+    session -- yes --> delete[Delete .burrow/request.json and .burrow/response.json if present]
+    --> ok([EX_OK])
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| input | `done-invocation` | SHALL be invoked as `burrow done`. | interface |
+| session | `done-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`. | error |
+| delete | `done-deletes-request` | SHALL delete `.burrow/request.json`. | data |
+| delete | `done-deletes-response` | SHALL delete `.burrow/response.json` if it exists. | data |
+
+---
+
 ## Tag Glossary
 
 ### Standard tags

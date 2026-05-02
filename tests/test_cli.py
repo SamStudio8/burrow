@@ -133,6 +133,44 @@ def test_send_writes_preamble_and_request_to_stdout(session, capsys):
     assert str(request.id) in out
 
 
+@pytest.mark.rule("done-invocation")
+def test_done_is_valid_subcommand(session):
+    with patch("sys.argv", ["burrow", "done"]):
+        main()
+
+
+@pytest.mark.rule("done-noinput")
+def test_done_fails_with_no_session(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "done"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == EX_NOINPUT
+    assert "No session found" in capsys.readouterr().err
+
+
+@pytest.mark.rule("done-deletes-request")
+def test_done_deletes_request(session):
+    with patch("sys.argv", ["burrow", "done"]):
+        main()
+    assert not (session / ".burrow" / "request.json").exists()
+
+
+@pytest.mark.rule("done-deletes-response")
+def test_done_deletes_response_if_present(session):
+    (session / ".burrow" / "response.json").write_text("{}")
+    with patch("sys.argv", ["burrow", "done"]):
+        main()
+    assert not (session / ".burrow" / "response.json").exists()
+
+
+@pytest.mark.rule("done-deletes-response")
+def test_done_succeeds_without_response(session):
+    with patch("sys.argv", ["burrow", "done"]):
+        main()
+    assert not (session / ".burrow" / "request.json").exists()
+
+
 @pytest.mark.rule("init-excantcreat")
 def test_init_fails_if_session_exists(session, capsys):
     capsys.readouterr()

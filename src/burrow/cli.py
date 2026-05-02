@@ -51,6 +51,15 @@ def cmd_add(args):
     request.save()
 
 
+def cmd_done(args):
+    _current_request(ex_on_noinput=True)
+    burrow_dir = Path.cwd() / ".burrow"
+    (burrow_dir / "request.json").unlink()
+    response = burrow_dir / "response.json"
+    if response.exists():
+        response.unlink()
+
+
 def cmd_send(args):
     request = _current_request(ex_on_noinput=True)
     request_json = json.dumps(request.to_dict(), default=_serialise, indent=2)
@@ -84,6 +93,9 @@ def main():
 
     send_parser = subparsers.add_parser("send")
     send_parser.set_defaults(func=cmd_send)
+
+    done_parser = subparsers.add_parser("done")
+    done_parser.set_defaults(func=cmd_done)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
