@@ -1,10 +1,11 @@
 import argparse
 import sys
 from pathlib import Path
-from burrow.models import Request
+from burrow.models import Request, Response
 
 # did you know, you cant get these on windows
 EX_CANTCREAT = 73
+EX_DATAERR = 65
 EX_NOINPUT = 66
 EX_USAGE = 64
 
@@ -30,6 +31,16 @@ def cmd_init(args):
 
 def cmd_validate(args):
     request = _current_request(ex_on_noinput=True)
+    if args.response is None:
+        return
+    try:
+        Response.load(Path(args.response), request)
+    except FileNotFoundError:
+        sys.stderr.write(f"response file not found: {args.response}\n")
+        sys.exit(EX_NOINPUT)
+    except ValueError as e:
+        sys.stderr.write(f"validation failed: {e}\n")
+        sys.exit(EX_DATAERR)
 
 
 def cmd_add(args):

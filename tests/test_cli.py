@@ -1,6 +1,8 @@
+import json
 import pytest
 from unittest.mock import patch
-from burrow.cli import main, EX_CANTCREAT, EX_NOINPUT, EX_USAGE
+from burrow.cli import main, EX_CANTCREAT, EX_DATAERR, EX_NOINPUT, EX_USAGE
+from burrow.models import Request
 
 
 @pytest.mark.rule("init-invocation")
@@ -69,8 +71,45 @@ def test_validate_accepts_optional_response_path(tmp_path, monkeypatch, argv):
     monkeypatch.chdir(tmp_path)
     with patch("sys.argv", ["burrow", "init"]):
         main()
+    if "response.json" in argv:
+        request = Request.load(tmp_path)
+        (tmp_path / "response.json").write_text(json.dumps({
+            "id": "a1b2c3d4-0000-0000-0000-000000000001",
+            "request_id": str(request.id),
+            "created_at": "2026-04-29T21:00:00+00:00",
+            "summary": "",
+            "agent_metadata": {"name": "test", "version": "0"},
+            "comments": [],
+        }))
     with patch("sys.argv", argv):
         main()
+
+
+@pytest.mark.rule("validate-noinput")
+def test_validate_fails_with_missing_response_file(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "init"]):
+        main()
+    capsys.readouterr()
+    with patch("sys.argv", ["burrow", "validate", "response.json"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == EX_NOINPUT
+    assert "response.json" in capsys.readouterr().err
+
+
+@pytest.mark.rule("validate-dataerr")
+def test_validate_fails_with_invalid_response(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    with patch("sys.argv", ["burrow", "init"]):
+        main()
+    capsys.readouterr()
+    # response.json references a different request_id
+    (tmp_path / "response.json").write_text('{"request_id": "00000000-0000-0000-0000-000000000000"}')
+    with patch("sys.argv", ["burrow", "validate", "response.json"]):
+        with pytest.raises(SystemExit) as exc:
+            main()
+    assert exc.value.code == EX_DATAERR
 
 
 @pytest.mark.rule("validate-noinput")

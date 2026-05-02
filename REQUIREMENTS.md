@@ -170,7 +170,7 @@ flowchart TD
 |---|---|---|---|
 | input | `validate-invocation` | SHALL be invoked as `burrow validate`. | interface |
 | input | `validate-response-optional` | SHALL accept an optional path to a response JSON file. | interface |
-| session | `validate-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`. | error |
+| session | `validate-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`, or if a response file path is provided but does not exist. | error |
 | validate | `validate-dataerr` | SHALL exit with `EX_DATAERR` if the Response fails validation against the Request. | error |
 
 ---
