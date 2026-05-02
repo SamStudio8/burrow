@@ -19,6 +19,13 @@ def colour_line(line):
 
 
 @dataclass
+class Anchor:
+    file: str
+    first_line: int
+    last_line: int
+
+
+@dataclass
 class Hunk:
     file: str
     target_start: int
@@ -125,6 +132,8 @@ class BurrowApp(App):
         Binding("[", "prev_hunk", "Prev hunk"),
         Binding("j", "next_line", "Next line"),
         Binding("k", "prev_line", "Prev line"),
+        Binding("v", "select", "Select"),
+        Binding("#", "comment", "Comment"),
     ]
 
     selected_hunk = reactive(0)
@@ -134,6 +143,8 @@ class BurrowApp(App):
         super().__init__()
         self.request = request
         self.hunks = parse_diff(get_diff(request.repo_root))
+        self.composing = None
+        self.selecting = None
 
     def compose(self):
         yield BurrowHeader()
@@ -160,6 +171,7 @@ class BurrowApp(App):
 
     def watch_selected_line(self, new):
         self._update_line_highlight(new)
+        self._update_selection_highlight()
 
     def _update_line_highlight(self, index):
         h = self.selected_hunk
@@ -169,6 +181,17 @@ class BurrowApp(App):
             widget = self.query_one(f"#hunk-{h}-line-{i}")
             widget.set_class(i == index, "selected")
         self.query_one(f"#hunk-{h}-line-{index}").scroll_visible()
+
+    def _update_selection_highlight(self):
+        h = self.selected_hunk
+        if not self.hunks:
+            return
+        if self.selecting is None:
+            return
+        lo = min(self.selecting, self.selected_line)
+        hi = max(self.selecting, self.selected_line)
+        for i in range(len(self.hunks[h].lines)):
+            self.query_one(f"#hunk-{h}-line-{i}").set_class(lo <= i <= hi, "selected")
 
     def action_next_line(self):
         if self.hunks:
@@ -191,3 +214,37 @@ class BurrowApp(App):
     def action_prev_hunk(self):
         if self.hunks:
             self.selected_hunk = max(self.selected_hunk - 1, 0)
+
+    def action_select(self):
+        if not self.hunks:
+            return
+        if self.selecting is not None:
+            self.selecting = None
+            self._update_line_highlight(self.selected_line)
+        else:
+            self.selecting = self.selected_line
+            self._update_selection_highlight()
+
+    def _target_line_for(self, hunk, line_index):
+        target_line = hunk.target_start
+        for i, line in enumerate(hunk.lines):
+            if i == line_index:
+                break
+            if not line.startswith("-"):
+                target_line += 1
+        return target_line
+
+    def action_comment(self):
+        if not self.hunks:
+            return
+        hunk = self.hunks[self.selected_hunk]
+        if self.selecting is not None:
+            anchor_index = self.selecting
+            end_index = self.selected_line
+            first = self._target_line_for(hunk, min(anchor_index, end_index))
+            last = self._target_line_for(hunk, max(anchor_index, end_index))
+            self.selecting = None
+        else:
+            first = self._target_line_for(hunk, self.selected_line)
+            last = first
+        self.composing = Anchor(file=hunk.file, first_line=first, last_line=last)

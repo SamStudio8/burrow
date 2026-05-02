@@ -296,8 +296,12 @@ flowchart TD
 
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
-| select | `comment-select-line` | SHALL allow the user to mark a single line as the comment anchor. | usability |
-| select | `comment-select-range` | SHALL allow the user to mark a range of lines as the comment anchor. | usability |
+| select | `comment-select-range` | SHALL open the compose input anchored to the current line (single-line) when the user presses `#`, or to the selected range when the user presses `#` in selection mode. | usability |
+| select | `comment-select-range-start` | SHALL enter selection mode anchored to the current line when the user presses `v`. | usability |
+| select | `comment-select-range-extend` | SHALL extend the selection to the current line as the user navigates with `j`/`k` in selection mode. | usability |
+| select | `comment-select-range-highlight` | SHALL visually highlight all lines between the selection anchor and the current line while in selection mode. | usability |
+| select | `comment-select-range-cancel` | SHALL exit selection mode without opening the compose input when the user presses `v` again while in selection mode. | usability |
+| select | `comment-select-range-cross-hunk` | SHALL discard selection mode if the user navigates to a different hunk. | usability |
 | select | `comment-select-any-file` | SHALL allow comments to be anchored to any line in any file, not limited to diff hunks. | usability |
 | compose | `comment-compose` | SHALL present an input for the user to type the comment body before attaching. | usability |
 | attach | `comment-attach-tui` | SHALL attach the comment to the current session and persist it, equivalent to `burrow c`. | data |

@@ -221,6 +221,80 @@ async def test_prev_hunk_clamps_at_start(tmp_path):
             assert app.selected_hunk == 0
 
 
+@pytest.mark.rule("comment-select-range")
+async def test_hash_opens_compose_on_current_line(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            await pilot.press("#")
+            assert app.composing is not None
+            assert app.composing.file == "foo.py"
+            assert app.composing.first_line == app.composing.last_line
+
+
+@pytest.mark.rule("comment-select-range-highlight")
+async def test_selection_highlights_range_of_lines(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("v")
+            await pilot.press("j")
+            await pilot.press("j")
+            assert "selected" in app.screen.query_one("#hunk-0-line-0").classes
+            assert "selected" in app.screen.query_one("#hunk-0-line-1").classes
+            assert "selected" in app.screen.query_one("#hunk-0-line-2").classes
+            assert "selected" not in app.screen.query_one("#hunk-0-line-3").classes
+
+
+@pytest.mark.rule("comment-select-range-extend")
+async def test_hash_in_selection_mode_uses_range(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("v")
+            await pilot.press("j")
+            await pilot.press("j")
+            await pilot.press("#")
+            assert app.composing is not None
+            assert app.composing.first_line != app.composing.last_line
+
+
+@pytest.mark.rule("comment-select-range-cancel")
+async def test_v_again_exits_selection_mode(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("v")
+            assert app.selecting is not None
+            await pilot.press("v")
+            assert app.selecting is None
+
+
+@pytest.mark.rule("comment-select-range-cancel")
+async def test_v_cancel_clears_selection_highlight(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("v")
+            await pilot.press("j")
+            await pilot.press("v")
+            assert "selected" not in app.screen.query_one("#hunk-0-line-0").classes
+            assert "selected" in app.screen.query_one("#hunk-0-line-1").classes
+
+
+@pytest.mark.rule("comment-select-range-start")
+async def test_v_enters_selection_mode_at_current_line(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            assert app.selecting is None
+            await pilot.press("v")
+            assert app.selecting is not None
+            assert app.selecting == app.selected_line
+
+
 @pytest.mark.rule("diff-nav-hunk-highlight")
 async def test_selected_hunk_is_highlighted(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
