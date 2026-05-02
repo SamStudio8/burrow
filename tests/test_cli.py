@@ -5,20 +5,20 @@ from burrow.cli import main, EX_CANTCREAT, EX_DATAERR, EX_NOINPUT, EX_USAGE
 from burrow.models import Request
 
 
-@pytest.mark.rule("init-invocation")
-def test_init_is_valid_subcommand(tmp_path, monkeypatch, capsys):
+@pytest.mark.rule("start-invocation")
+def test_start_is_valid_subcommand(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    with patch("sys.argv", ["burrow", "init"]):
+    with patch("sys.argv", ["burrow", "start"]):
         main()
     assert "Session initialized at .burrow/request.json" in capsys.readouterr().err
 
 
-@pytest.mark.rule("init-summary-optional")
+@pytest.mark.rule("start-summary-optional")
 @pytest.mark.parametrize("argv", [
-    ["burrow", "init", "my review summary"],
-    ["burrow", "init"],
+    ["burrow", "start", "my review summary"],
+    ["burrow", "start"],
 ])
-def test_init_accepts_optional_summary(tmp_path, monkeypatch, argv):
+def test_start_accepts_optional_summary(tmp_path, monkeypatch, argv):
     monkeypatch.chdir(tmp_path)
     with patch("sys.argv", argv):
         main()
@@ -133,48 +133,48 @@ def test_send_writes_preamble_and_request_to_stdout(session, capsys):
     assert str(request.id) in out
 
 
-@pytest.mark.rule("done-invocation")
-def test_done_is_valid_subcommand(session):
-    with patch("sys.argv", ["burrow", "done"]):
+@pytest.mark.rule("end-invocation")
+def test_end_is_valid_subcommand(session):
+    with patch("sys.argv", ["burrow", "end"]):
         main()
 
 
-@pytest.mark.rule("done-noinput")
-def test_done_fails_with_no_session(tmp_path, monkeypatch, capsys):
+@pytest.mark.rule("end-noinput")
+def test_end_fails_with_no_session(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    with patch("sys.argv", ["burrow", "done"]):
+    with patch("sys.argv", ["burrow", "end"]):
         with pytest.raises(SystemExit) as exc:
             main()
     assert exc.value.code == EX_NOINPUT
     assert "No session found" in capsys.readouterr().err
 
 
-@pytest.mark.rule("done-deletes-request")
-def test_done_deletes_request(session):
-    with patch("sys.argv", ["burrow", "done"]):
+@pytest.mark.rule("end-deletes-request")
+def test_end_deletes_request(session):
+    with patch("sys.argv", ["burrow", "end"]):
         main()
     assert not (session / ".burrow" / "request.json").exists()
 
 
-@pytest.mark.rule("done-deletes-response")
-def test_done_deletes_response_if_present(session):
+@pytest.mark.rule("end-deletes-response")
+def test_end_deletes_response_if_present(session):
     (session / ".burrow" / "response.json").write_text("{}")
-    with patch("sys.argv", ["burrow", "done"]):
+    with patch("sys.argv", ["burrow", "end"]):
         main()
     assert not (session / ".burrow" / "response.json").exists()
 
 
-@pytest.mark.rule("done-deletes-response")
-def test_done_succeeds_without_response(session):
-    with patch("sys.argv", ["burrow", "done"]):
+@pytest.mark.rule("end-deletes-response")
+def test_end_succeeds_without_response(session):
+    with patch("sys.argv", ["burrow", "end"]):
         main()
     assert not (session / ".burrow" / "request.json").exists()
 
 
-@pytest.mark.rule("init-excantcreat")
-def test_init_fails_if_session_exists(session, capsys):
+@pytest.mark.rule("start-excantcreat")
+def test_start_fails_if_session_exists(session, capsys):
     capsys.readouterr()
-    with patch("sys.argv", ["burrow", "init"]):
+    with patch("sys.argv", ["burrow", "start"]):
         with pytest.raises(SystemExit) as exc:
             main()
     assert exc.value.code == EX_CANTCREAT

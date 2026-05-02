@@ -16,13 +16,13 @@ def _current_request(ex_on_noinput=False):
     session = Path.cwd() / ".burrow" / "request.json"
     if not session.exists():
         if ex_on_noinput:
-            sys.stderr.write("No session found — run 'burrow init' first\n")
+            sys.stderr.write("No session found — run 'burrow start' first\n")
             sys.exit(EX_NOINPUT)
         return None
     return Request.load(Path.cwd())
 
 
-def cmd_init(args):
+def cmd_start(args):
     if _current_request() is not None:
         sys.stderr.write("A session already exists at .burrow/request.json\n")
         sys.exit(EX_CANTCREAT)
@@ -51,7 +51,7 @@ def cmd_add(args):
     request.save()
 
 
-def cmd_done(args):
+def cmd_end(args):
     _current_request(ex_on_noinput=True)
     burrow_dir = Path.cwd() / ".burrow"
     (burrow_dir / "request.json").unlink()
@@ -76,9 +76,9 @@ def main():
     parser = BurrowParser(prog="burrow")
     subparsers = parser.add_subparsers(dest="command")
 
-    init_parser = subparsers.add_parser("init")
-    init_parser.add_argument("summary", nargs="?", default="")
-    init_parser.set_defaults(func=cmd_init)
+    start_parser = subparsers.add_parser("start")
+    start_parser.add_argument("summary", nargs="?", default="")
+    start_parser.set_defaults(func=cmd_start)
 
     add_parser = subparsers.add_parser("c")
     add_parser.add_argument("file")
@@ -94,8 +94,8 @@ def main():
     send_parser = subparsers.add_parser("send")
     send_parser.set_defaults(func=cmd_send)
 
-    done_parser = subparsers.add_parser("done")
-    done_parser.set_defaults(func=cmd_done)
+    end_parser = subparsers.add_parser("end")
+    end_parser.set_defaults(func=cmd_end)
 
     args = parser.parse_args()
     if hasattr(args, "func"):

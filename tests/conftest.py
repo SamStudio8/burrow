@@ -10,7 +10,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 @pytest.fixture
 def session(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    with patch("sys.argv", ["burrow", "init"]):
+    with patch("sys.argv", ["burrow", "start"]):
         main()
     return tmp_path
 

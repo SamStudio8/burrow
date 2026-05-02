@@ -85,11 +85,11 @@ flowchart TD
 
 ---
 
-#### SCN-CLI-INIT: User initialises a session
+#### SCN-CLI-START: User initialises a session
 
 ```mermaid
 flowchart TD
-    input([burrow init summary?])
+    input([burrow start summary?])
     --> exists{.burrow/request.json exists?}
     exists -- yes --> error([EX_CANTCREAT])
     exists -- no --> create[[SCN-REQUEST]]
@@ -98,9 +98,9 @@ flowchart TD
 
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
-| input | `init-invocation` | SHALL be invoked as `burrow init`. | interface |
-| input | `init-summary-optional` | SHALL accept an optional summary argument. | interface |
-| exists | `init-excantcreat` | SHALL exit with `EX_CANTCREAT` if `.burrow/request.json` already exists. | error |
+| input | `start-invocation` | SHALL be invoked as `burrow start`. | interface |
+| input | `start-summary-optional` | SHALL accept an optional summary argument. | interface |
+| exists | `start-excantcreat` | SHALL exit with `EX_CANTCREAT` if `.burrow/request.json` already exists. | error |
 
 ---
 
@@ -194,11 +194,11 @@ flowchart TD
 
 ---
 
-#### SCN-CLI-DONE: User closes the current session
+#### SCN-CLI-END: User closes the current session
 
 ```mermaid
 flowchart TD
-    input([burrow done])
+    input([burrow end])
     --> session{.burrow/request.json exists?}
     session -- no --> noinput([EX_NOINPUT])
     session -- yes --> delete[Delete .burrow/request.json and .burrow/response.json if present]
@@ -207,10 +207,10 @@ flowchart TD
 
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
-| input | `done-invocation` | SHALL be invoked as `burrow done`. | interface |
-| session | `done-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`. | error |
-| delete | `done-deletes-request` | SHALL delete `.burrow/request.json`. | data |
-| delete | `done-deletes-response` | SHALL delete `.burrow/response.json` if it exists. | data |
+| input | `end-invocation` | SHALL be invoked as `burrow end`. | interface |
+| session | `end-noinput` | SHALL exit with `EX_NOINPUT` if no session exists at `.burrow/request.json`. | error |
+| delete | `end-deletes-request` | SHALL delete `.burrow/request.json`. | data |
+| delete | `end-deletes-response` | SHALL delete `.burrow/response.json` if it exists. | data |
 
 ---
 
