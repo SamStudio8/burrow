@@ -8,9 +8,9 @@ Author: SN
 
 ## Introduction
 
-Burrow is a terminal tool for reviewing code changes produced by coding agents (e.g. Codex, Claude Code). A human reviewer inspects a diff in the terminal, attaches structured comments to specific locations in the diff, and triggers the coding agent to address those comments. Burrow exchanges JSON with the agent: a Request carrying the reviewer's comments goes out, and a Response comes back from the agent.
+Burrow is a terminal tool for reviewing code changes produced by coding agents (e.g. Codex, Claude Code). A Reviewer inspects a diff in the terminal, attaches structured comments to specific locations in the diff, and triggers a coding agent to address those comments. Burrow exchanges JSON with the agent: a Request carrying the Reviewer's comments goes out, and a Response comes back from the agent.
 
-Burrow is not an agent. It is the interface between a human reviewer and an agent. It does not generate code, interpret comments, or decide how to act on them — that is the agent's responsibility.
+Burrow is not an agent. It is the interface between a Reviewer and an agent. It does not generate code, interpret comments, or decide how to act on them — that is the agent's responsibility.
 
 ---
 
@@ -24,7 +24,7 @@ Burrow is not an agent. It is the interface between a human reviewer and an agen
 | Diff | A set of file changes that the reviewer is evaluating. The agent is assumed to have access to the diff via the repo. |
 | Request | A JSON document sent to the agent containing a unique id, a timestamp, a summary, and the reviewer's list of Comments. |
 | Response | A JSON document returned by the agent containing the originating request id, a timestamp, a summary, agent metadata, and the same Comments with updated statuses and replies. |
-| Reviewer | The human operator using Burrow in the terminal to inspect a diff and author Comments. |
+| Reviewer | A human or agent using Burrow to inspect a diff and author Comments. |
 | Session | A single review lifecycle: from authoring Comments to dispatching a Request and receiving a Response. |
 | Sysexit | A BSD standard exit code from `sysexits.h`, used by Burrow to signal error conditions to the shell. |
 | Status | The lifecycle state of a Comment. `todo` is the initial state (no agent response yet). `done` (change implemented), `partial` (partially implemented), `refused` (agent chose not to make the change), `blocked` (agent was unable to make the change). |
