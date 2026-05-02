@@ -5,7 +5,7 @@ from rich.text import Text
 from textual.app import App
 from textual.binding import Binding
 from textual.reactive import reactive
-from textual.widgets import Footer, Static
+from textual.widgets import Footer, Static, TextArea
 from textual.containers import ScrollableContainer
 from unidiff import PatchSet
 
@@ -106,6 +106,36 @@ class HunkWidget(Static):
         yield HunkHeader(label, id=f"hunk-{self._index}-header")
         for i, line in enumerate(hunk.lines):
             yield DiffLine(colour_line(line.rstrip("\n")), id=f"hunk-{self._index}-line-{i}")
+
+
+class ComposeWidget(TextArea):
+    DEFAULT_CSS = """
+    ComposeWidget {
+        height: auto;
+        min-height: 2;
+        border: solid $accent;
+        margin: 0 1;
+    }
+    ComposeWidget > .text-area--cursor-line {
+        background: transparent;
+    }
+    """
+
+    def on_mount(self):
+        self.show_line_numbers = False
+        self.focus()
+
+    def on_text_area_changed(self):
+        lines = self.text.count("\n") + 1
+        self.styles.height = lines + 2  # +2 for border
+
+    def _on_key(self, event):
+        if event.key == "ctrl+j":
+            event.stop()
+            self.app.action_submit_compose()
+        elif event.key == "escape":
+            event.stop()
+            self.app.action_cancel_compose()
 
 
 class BurrowHeader(Static):
@@ -244,8 +274,25 @@ class BurrowApp(App):
             end_index = self.selected_line
             first = self._target_line_for(hunk, min(anchor_index, end_index))
             last = self._target_line_for(hunk, max(anchor_index, end_index))
+            last_line_index = max(anchor_index, end_index)
             self.selecting = None
         else:
             first = self._target_line_for(hunk, self.selected_line)
             last = first
+            last_line_index = self.selected_line
         self.composing = Anchor(file=hunk.file, first_line=first, last_line=last)
+        anchor_widget = self.query_one(f"#hunk-{self.selected_hunk}-line-{last_line_index}")
+        self.mount(ComposeWidget(), after=anchor_widget)
+
+    def action_cancel_compose(self):
+        widgets = self.screen.query(ComposeWidget)
+        if widgets:
+            widgets.first().remove()
+            self.composing = None
+            self.query_one("#diff-view").focus()
+
+    def action_submit_compose(self):
+        widgets = self.screen.query(ComposeWidget)
+        if widgets:
+            widgets.first().remove()
+            self.query_one("#diff-view").focus()

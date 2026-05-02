@@ -303,7 +303,10 @@ flowchart TD
 | select | `comment-select-range-cancel` | SHALL exit selection mode without opening the compose input when the user presses `v` again while in selection mode. | usability |
 | select | `comment-select-range-cross-hunk` | SHALL discard selection mode if the user navigates to a different hunk. | usability |
 | select | `comment-select-any-file` | SHALL allow comments to be anchored to any line in any file, not limited to diff hunks. | usability |
-| compose | `comment-compose` | SHALL present an input for the user to type the comment body before attaching. | usability |
+| compose | `comment-compose` | SHALL insert a multiline text input immediately after the last line of the selection in the diff view when the user presses `#`. | usability |
+| compose | `comment-compose-submit` | SHALL submit the composed comment and remove the input when the user presses `ctrl+enter`. | usability |
+| compose | `comment-compose-cancel` | SHALL discard the composed comment and remove the input when the user presses `escape`. | usability |
+| compose | `comment-compose-expand` | SHALL grow the compose input to fit its content as the user types, with no internal scrollbar. | usability |
 | attach | `comment-attach-tui` | SHALL attach the comment to the current session and persist it, equivalent to `burrow c`. | data |
 | error | `comment-error-tui` | SHALL display validation errors inline without closing the TUI. | usability, error |
 

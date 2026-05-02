@@ -260,6 +260,42 @@ async def test_hash_in_selection_mode_uses_range(tmp_path):
             assert app.composing.first_line != app.composing.last_line
 
 
+@pytest.mark.rule("comment-compose")
+async def test_hash_inserts_compose_widget_after_selected_line(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            await pilot.press("#")
+            compose = app.screen.query("ComposeWidget")
+            assert len(compose) == 1
+
+
+@pytest.mark.rule("comment-compose-expand")
+async def test_compose_grows_with_content(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.press("#")
+            widget = app.screen.query_one("ComposeWidget")
+            initial_height = widget.size.height
+            await pilot.press("a", "enter", "b", "enter", "c")
+            assert widget.size.height > initial_height
+
+
+@pytest.mark.rule("comment-compose-cancel")
+async def test_escape_cancels_compose(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("#")
+            assert app.composing is not None
+            assert len(app.screen.query("ComposeWidget")) == 1
+            await pilot.press("escape")
+            assert app.composing is None
+            assert len(app.screen.query("ComposeWidget")) == 0
+
+
 @pytest.mark.rule("comment-select-range-cross-hunk")
 async def test_hunk_navigation_discards_selection(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
