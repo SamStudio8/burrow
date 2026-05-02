@@ -20,15 +20,14 @@ Burrow is not an agent. It is the interface between a human reviewer and an agen
 |---|---|
 | Agent | An external coding agent (e.g. Codex, Claude Code) that receives a Request and produces code changes. Burrow treats the agent as a black box. |
 | Anchor | A location reference within a file: a tuple of `(file, first_line, last_line)`. A single-line anchor has `first_line == last_line`. A file-level anchor has `first_line == last_line == 0`. An anchor may be updated by the agent in its Response if the referenced code has moved. |
-| Comment | A structured annotation authored by the reviewer, carrying an anchor, a markdown body, and a stable id. |
+| Comment | A structured annotation authored by the reviewer, carrying an anchor, a body, a stable id, a status (default `todo`), and an optional reply from the agent. A Comment with a non-`todo` status carries the agent's reply as a non-empty string. |
 | Diff | A set of file changes that the reviewer is evaluating. The agent is assumed to have access to the diff via the repo. |
-| Reply | An agent's response to a single Comment, carrying a status, a body, and optionally a revised anchor. |
 | Request | A JSON document sent to the agent containing a unique id, a timestamp, a summary, and the reviewer's list of Comments. |
-| Response | A JSON document returned by the agent containing the originating request id, a timestamp, a summary, agent metadata, and a list of Replies. |
+| Response | A JSON document returned by the agent containing the originating request id, a timestamp, a summary, agent metadata, and the same Comments with updated statuses and replies. |
 | Reviewer | The human operator using Burrow in the terminal to inspect a diff and author Comments. |
 | Session | A single review lifecycle: from authoring Comments to dispatching a Request and receiving a Response. |
 | Sysexit | A BSD standard exit code from `sysexits.h`, used by Burrow to signal error conditions to the shell. |
-| Status | The outcome field on a Reply. One of: `done` (agent believes the change was implemented), `partial` (change was partially implemented), `refused` (agent chose not to make the change), `blocked` (agent was unable to make the change). |
+| Status | The lifecycle state of a Comment. `todo` is the initial state (no agent response yet). `done` (change implemented), `partial` (partially implemented), `refused` (agent chose not to make the change), `blocked` (agent was unable to make the change). |
 
 ---
 
@@ -78,6 +77,9 @@ flowchart TD
 | validate | `anchor-lines-positive` | SHALL reject a Comment where either line number is negative. | data, error |
 | validate | `anchor-range-valid` | SHALL reject a Comment whose `first_line` and `last_line` do not form a valid range within the file. | data, error |
 | validate | `comment-body-nonempty` | SHALL reject a Comment whose body is empty or consists only of whitespace. | data, error |
+| validate | `comment-status-valid` | SHALL reject a Comment whose status is not one of: `todo`, `done`, `partial`, `refused`, `blocked`. | data, error |
+| validate | `reply-todo-paired` | SHALL reject a Comment where status is `todo` and reply is present, or where status is not `todo` and reply is absent. | data, error |
+| validate | `reply-nonempty` | SHALL reject a Comment whose reply is present but empty or consists only of whitespace. | data, error |
 | attach | `comment-id-unique` | SHALL assign a unique identifier to each created Comment. | data |
 | write | `write-session` | SHALL write the current Request to `.burrow/request.json` after creation and after each Comment is attached. | data |
 
@@ -136,15 +138,13 @@ flowchart TD
 
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
-| load | `load-response` | SHALL reconstruct a Response from a JSON file, preserving all fields and Replies. | data |
+| load | `load-response` | SHALL reconstruct a Response from a JSON file, preserving all fields and Comments. | data |
 | load | `response-request-id` | SHALL record the originating Request id on the Response. | data |
 | load | `response-created-at` | SHALL record the agent's creation timestamp on the Response. | data |
 | load | `response-agent-metadata` | SHALL record agent metadata (at minimum: name and version) on the Response. | data |
-| load | `reply-status-valid` | SHALL reject a Reply whose status is not one of: `done`, `partial`, `refused`, `blocked`. | data, error |
-| load | `reply-body-nonempty` | SHALL reject a Reply whose body is empty or consists only of whitespace. | data, error |
 | load | `validate-request-id-match` | SHALL reject a Response whose `request_id` does not match the id of the current Request. | data, error |
-| load | `validate-all-comments-addressed` | SHALL reject a Response that does not include a Reply for every Comment in the Request. | data, error |
-| load | `validate-no-unknown-replies` | SHALL reject a Response that includes a Reply whose Comment id is not present in the Request. | data, error |
+| load | `validate-all-comments-addressed` | SHALL reject a Response that does not include every Comment from the Request, or in which any Comment has status `todo`. | data, error |
+| load | `validate-no-unknown-comments` | SHALL reject a Response that includes a Comment whose id is not present in the Request. | data, error |
 
 ---
 
