@@ -64,6 +64,25 @@ class BurrowApp(App):
         Binding("ctrl+c", "quit", "Quit"),
     ]
 
+    def __init__(self, repo_root):
+        super().__init__()
+        self.repo_root = repo_root
+        self.hunks = parse_diff(get_diff(repo_root))
+
     def compose(self):
         yield BurrowHeader()
+        yield Static(self._render_hunks(), id="diff-view")
         yield Footer()
+
+    def _render_hunks(self):
+        if not self.hunks:
+            return "No uncommitted changes."
+        parts = []
+        current_file = None
+        for hunk in self.hunks:
+            if hunk.file != current_file:
+                current_file = hunk.file
+                parts.append(f"--- {hunk.file}")
+            parts.append(hunk.header)
+            parts.extend(line.rstrip("\n") for line in hunk.lines)
+        return "\n".join(parts)

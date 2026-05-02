@@ -104,4 +104,4 @@ def main():
     else:
         if _current_request() is None:
             Request(summary="", repo_root=Path.cwd()).save()
-        BurrowApp().run()
+        BurrowApp(repo_root=Path.cwd()).run()

@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch
-from burrow.tui import get_diff, parse_diff
+from burrow.tui import get_diff, parse_diff, BurrowApp
 
 
 @pytest.mark.rule("diff-source")
@@ -66,3 +66,15 @@ def test_parse_diff_hunk_has_header():
     hunks = parse_diff(SAMPLE_DIFF)
     assert hunks[0].header.startswith("@@")
     assert hunks[2].header.startswith("@@")
+
+
+@pytest.mark.rule("diff-hunks")
+async def test_diff_hunks_displayed_in_tui(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(repo_root=tmp_path)
+        async with app.run_test() as pilot:
+            text = str(app.screen.query_one("#diff-view").render())
+            assert "foo.py" in text
+            assert "+line2" in text
+            assert "-lineB" in text
