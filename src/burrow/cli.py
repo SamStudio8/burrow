@@ -9,9 +9,18 @@ EX_NOINPUT = 66
 EX_USAGE = 64
 
 
-def cmd_init(args):
+def _current_request(ex_on_noinput=False):
     session = Path.cwd() / ".burrow" / "request.json"
-    if session.exists():
+    if not session.exists():
+        if ex_on_noinput:
+            sys.stderr.write("No session found — run 'burrow init' first\n")
+            sys.exit(EX_NOINPUT)
+        return None
+    return Request.load(Path.cwd())
+
+
+def cmd_init(args):
+    if _current_request() is not None:
         sys.stderr.write("A session already exists at .burrow/request.json\n")
         sys.exit(EX_CANTCREAT)
     request = Request(summary=args.summary or "", repo_root=Path.cwd())
@@ -20,15 +29,11 @@ def cmd_init(args):
 
 
 def cmd_validate(args):
-    pass
+    _current_request(ex_on_noinput=True)
 
 
 def cmd_add(args):
-    session = Path.cwd() / ".burrow" / "request.json"
-    if not session.exists():
-        sys.stderr.write("No session found — run 'burrow init' first\n")
-        sys.exit(EX_NOINPUT)
-    request = Request.load(Path.cwd())
+    request = _current_request(ex_on_noinput=True)
     request.add_comment(file=args.file, first_line=int(args.first_line), last_line=int(args.last_line), body=args.body)
     request.save()
 
