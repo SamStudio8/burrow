@@ -4,6 +4,12 @@ from datetime import datetime, timezone
 from burrow.models import Comment, Request
 
 
+@pytest.mark.rule("comment-status-valid")
+def test_comment_rejects_invalid_status():
+    with pytest.raises(ValueError):
+        Comment(file="foo.py", first_line=1, last_line=1, body="a comment", status="hoot")
+
+
 @pytest.mark.rule("comment-body-nonempty")
 def test_comment_rejects_whitespace_body():
     with pytest.raises(ValueError):

@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import StrEnum
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -15,6 +16,14 @@ def _serialise(obj):
     raise TypeError(f"cannot serialise {type(obj)}")
 
 
+class Status(StrEnum):
+    TODO = "todo"
+    DONE = "done"
+    PARTIAL = "partial"
+    REFUSED = "refused"
+    BLOCKED = "blocked"
+
+
 @dataclass
 class Comment:
     file: str
@@ -22,8 +31,11 @@ class Comment:
     last_line: int
     body: str
     id: UUID = field(default_factory=uuid4)
+    status: Status = Status.TODO
+    reply: str | None = None
 
     def __post_init__(self):
+        self.status = Status(self.status)
         if not self.body.strip():
             raise ValueError("body must not be empty or whitespace")
         if self.first_line < 0 or self.last_line < 0:

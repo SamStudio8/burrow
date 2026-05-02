@@ -29,7 +29,7 @@ def cmd_init(args):
 
 
 def cmd_validate(args):
-    _current_request(ex_on_noinput=True)
+    request = _current_request(ex_on_noinput=True)
 
 
 def cmd_add(args):
