@@ -12,7 +12,8 @@ from unidiff import PatchSet
 @dataclass
 class Hunk:
     file: str
-    header: str
+    target_start: int
+    target_length: int
     lines: list[str]
 
 
@@ -20,14 +21,10 @@ def parse_diff(raw):
     hunks = []
     for patched_file in PatchSet(raw):
         for hunk in patched_file:
-            header = (
-                f"@@ -{hunk.source_start},{hunk.source_length}"
-                f" +{hunk.target_start},{hunk.target_length} @@"
-                f" {hunk.section_header}".rstrip()
-            )
             hunks.append(Hunk(
                 file=patched_file.path,
-                header=header,
+                target_start=hunk.target_start,
+                target_length=hunk.target_length,
                 lines=[str(line) for line in hunk],
             ))
     return hunks
@@ -43,24 +40,44 @@ def get_diff(repo_root):
     return result.stdout
 
 
+class HunkHeader(Static):
+    DEFAULT_CSS = """
+    HunkHeader {
+        background: $surface;
+        color: $text-muted;
+        text-style: bold;
+        padding: 0 1;
+    }
+    """
+
+
 class HunkWidget(Static):
     DEFAULT_CSS = """
     HunkWidget {
         padding: 0 1;
         border-left: thick transparent;
+        height: auto;
     }
     HunkWidget.selected {
         border-left: thick $accent;
     }
+    HunkWidget.selected HunkHeader {
+        background: $accent;
+        color: $text;
+    }
     """
 
-    def __init__(self, hunk, index, show_filename):
-        parts = []
-        if show_filename:
-            parts.append(f"--- {hunk.file}")
-        parts.append(hunk.header)
-        parts.extend(line.rstrip("\n") for line in hunk.lines)
-        super().__init__("\n".join(parts), id=f"hunk-{index}")
+    def __init__(self, hunk, index):
+        super().__init__(id=f"hunk-{index}")
+        self._hunk = hunk
+        self._index = index
+
+    def compose(self):
+        hunk = self._hunk
+        end = hunk.target_start + hunk.target_length - 1
+        label = f"{hunk.file}  ·  {hunk.target_start}–{end}"
+        yield HunkHeader(label, id=f"hunk-{self._index}-header")
+        yield Static("\n".join(line.rstrip("\n") for line in hunk.lines))
 
 
 class BurrowHeader(Static):
@@ -100,11 +117,8 @@ class BurrowApp(App):
             if not self.hunks:
                 yield Static("No uncommitted changes.")
             else:
-                current_file = None
                 for i, hunk in enumerate(self.hunks):
-                    show_filename = hunk.file != current_file
-                    current_file = hunk.file
-                    yield HunkWidget(hunk, i, show_filename)
+                    yield HunkWidget(hunk, i)
         yield Footer()
 
     def on_mount(self):

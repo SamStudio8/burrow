@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import patch
+from textual.widgets import Static
 from burrow.models import Request
 from burrow.tui import get_diff, parse_diff, BurrowApp
 
@@ -63,10 +64,11 @@ def test_parse_diff_hunk_contains_lines():
 
 
 @pytest.mark.rule("diff-hunks")
-def test_parse_diff_hunk_has_header():
+def test_parse_diff_hunk_has_target_range():
     hunks = parse_diff(SAMPLE_DIFF)
-    assert hunks[0].header.startswith("@@")
-    assert hunks[2].header.startswith("@@")
+    assert hunks[0].target_start == 1
+    assert hunks[0].target_length == 4
+    assert hunks[2].target_start == 5
 
 
 @pytest.mark.rule("diff-hunks")
@@ -76,11 +78,24 @@ async def test_diff_hunks_displayed_in_tui(tmp_path, monkeypatch):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=request)
         async with app.run_test() as pilot:
-            text = str(app.screen.query_one("#hunk-0").render())
-            assert "foo.py" in text
+            widgets = app.screen.query_one("#hunk-0").query(Static)
+            text = " ".join(str(w.render()) for w in widgets)
             assert "+line2" in text
-            text1 = str(app.screen.query_one("#hunk-1").render())
+            widgets1 = app.screen.query_one("#hunk-1").query(Static)
+            text1 = " ".join(str(w.render()) for w in widgets1)
             assert "-lineB" in text1
+
+
+@pytest.mark.rule("diff-hunk-header")
+async def test_hunk_header_shows_filename_and_lines(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            header0 = str(app.screen.query_one("#hunk-0-header").render())
+            assert "foo.py" in header0
+            assert "@@" not in header0
+            header2 = str(app.screen.query_one("#hunk-2-header").render())
+            assert "bar.py" in header2
 
 
 @pytest.mark.rule("diff-nav-next-hunk")
