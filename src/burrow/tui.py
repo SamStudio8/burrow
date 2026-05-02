@@ -1,12 +1,21 @@
 import subprocess
 from dataclasses import dataclass
 
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.reactive import reactive
 from textual.widgets import Footer, Static
 from textual.containers import ScrollableContainer
 from unidiff import PatchSet
+
+
+def colour_line(line):
+    if line.startswith("+"):
+        return Text(line, style="green")
+    if line.startswith("-"):
+        return Text(line, style="red")
+    return Text(line, style="dim")
 
 
 @dataclass
@@ -77,7 +86,12 @@ class HunkWidget(Static):
         end = hunk.target_start + hunk.target_length - 1
         label = f"{hunk.file}  ·  {hunk.target_start}–{end}"
         yield HunkHeader(label, id=f"hunk-{self._index}-header")
-        yield Static("\n".join(line.rstrip("\n") for line in hunk.lines))
+        content = Text()
+        for i, line in enumerate(hunk.lines):
+            if i > 0:
+                content.append("\n")
+            content.append_text(colour_line(line.rstrip("\n")))
+        yield Static(content)
 
 
 class BurrowHeader(Static):
@@ -102,9 +116,12 @@ class BurrowApp(App):
         Binding("ctrl+c", "quit", "Quit"),
         Binding("]", "next_hunk", "Next hunk"),
         Binding("[", "prev_hunk", "Prev hunk"),
+        Binding("j", "next_line", "Next line"),
+        Binding("k", "prev_line", "Prev line"),
     ]
 
     selected_hunk = reactive(0)
+    selected_line = reactive(0)
 
     def __init__(self, request):
         super().__init__()
@@ -125,9 +142,19 @@ class BurrowApp(App):
         self._update_highlight(0)
 
     def watch_selected_hunk(self, new):
+        self.selected_line = 0
         self._update_highlight(new)
         if self.hunks:
             self.query_one(f"#hunk-{new}").scroll_visible()
+
+    def action_next_line(self):
+        if self.hunks:
+            max_line = len(self.hunks[self.selected_hunk].lines) - 1
+            self.selected_line = min(self.selected_line + 1, max_line)
+
+    def action_prev_line(self):
+        if self.hunks:
+            self.selected_line = max(self.selected_line - 1, 0)
 
     def _update_highlight(self, index):
         for i in range(len(self.hunks)):

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch
 from textual.widgets import Static
 from burrow.models import Request
-from burrow.tui import get_diff, parse_diff, BurrowApp
+from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line
 
 
 @pytest.mark.rule("diff-source")
@@ -96,6 +96,64 @@ async def test_hunk_header_shows_filename_and_lines(tmp_path):
             assert "@@" not in header0
             header2 = str(app.screen.query_one("#hunk-2-header").render())
             assert "bar.py" in header2
+
+
+@pytest.mark.rule("diff-line-colour")
+def test_colour_line():
+    added = colour_line("+added line")
+    removed = colour_line("-removed line")
+    context = colour_line(" context line")
+    assert "added line" in added.plain
+    assert "removed line" in removed.plain
+    assert "context line" in context.plain
+    assert added.style != removed.style
+    assert added.style != context.style
+
+
+@pytest.mark.rule("diff-nav-line")
+async def test_j_advances_line(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            assert app.selected_line == 0
+            await pilot.press("j")
+            assert app.selected_line == 1
+
+
+@pytest.mark.rule("diff-nav-line")
+async def test_k_retreats_line(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            await pilot.press("j")
+            assert app.selected_line == 2
+            await pilot.press("k")
+            assert app.selected_line == 1
+
+
+@pytest.mark.rule("diff-nav-line")
+async def test_line_nav_clamps_at_hunk_bounds(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("k")
+            assert app.selected_line == 0
+            for _ in range(10):
+                await pilot.press("j")
+            assert app.selected_line == len(app.hunks[0].lines) - 1
+
+
+@pytest.mark.rule("diff-nav-line")
+async def test_line_resets_on_hunk_change(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("j")
+            await pilot.press("j")
+            assert app.selected_line == 2
+            await pilot.press("]")
+            assert app.selected_line == 0
 
 
 @pytest.mark.rule("diff-nav-next-hunk")
