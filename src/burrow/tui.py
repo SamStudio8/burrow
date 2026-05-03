@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from rich.text import Text
 from textual.app import App
 from textual.binding import Binding
+from textual.keys import key_to_character
 from textual.reactive import reactive
-from textual.widgets import Footer, Static, TextArea
+from textual.widget import Widget
+from textual.widgets import Static, TextArea
 from textual.containers import ScrollableContainer
 from unidiff import PatchSet
 
@@ -147,6 +149,30 @@ class ComposeWidget(TextArea):
             self.app.action_cancel_compose()
 
 
+class StatusBar(Static):
+    DEFAULT_CSS = """
+    StatusBar {
+        height: 1;
+        background: $surface;
+        color: $text-muted;
+        padding: 0 1;
+    }
+    """
+
+    def __init__(self, app_ref):
+        super().__init__()
+        self._app_ref = app_ref
+
+    def render(self):
+        app = self._app_ref
+        hunks = app.hunks
+        n_files = len({h.file for h in hunks})
+        n_hunks = len(hunks)
+        pos = f"{app.selected_hunk + 1}/{n_hunks}" if n_hunks else "0/0"
+        n_comments = len(app.request.comments)
+        return f"{n_files} files  {n_hunks} hunks  hunk {pos}  {n_comments} comments"
+
+
 class CommentBlock(Static):
     DEFAULT_CSS = """
     CommentBlock {
@@ -164,6 +190,43 @@ class CommentBlock(Static):
 
     def render(self):
         return self._comment.body
+
+
+
+class HelpOverlay(Widget):
+    can_focus = True
+    DEFAULT_CSS = """
+    HelpOverlay {
+        layer: overlay;
+        background: $surface;
+        border: solid $accent;
+        padding: 1 2;
+        height: auto;
+        width: auto;
+        offset: 2 2;
+    }
+    """
+
+    def on_mount(self):
+        self.focus()
+
+    def render(self):
+        groups = {}
+        for b in self.app.BINDINGS:
+            if isinstance(b, Binding) and b.show and b.description:
+                key = key_to_character(b.key) or b.key
+                if b.action in groups:
+                    groups[b.action][0].append(key)
+                else:
+                    groups[b.action] = ([key], b.description)
+        lines = []
+        for keys, description in groups.values():
+            lines.append(f"  {', '.join(keys):<12} {description}")
+        return "\n".join(lines)
+
+    def _on_key(self, event):
+        event.stop()
+        self.remove()
 
 
 class BurrowHeader(Static):
@@ -192,6 +255,7 @@ class BurrowApp(App):
         Binding("k", "prev_line", "Prev line"),
         Binding("v", "select", "Select"),
         Binding("#", "comment", "Comment"),
+        Binding("question_mark", "help", "Help"),
     ]
 
     selected_hunk = reactive(0)
@@ -212,7 +276,7 @@ class BurrowApp(App):
             else:
                 for i, hunk in enumerate(self.hunks):
                     yield HunkWidget(hunk, i)
-        yield Footer()
+        yield StatusBar(self)
 
     def on_mount(self):
         self._update_highlight(0)
@@ -227,6 +291,7 @@ class BurrowApp(App):
         self._update_highlight(new)
         if self.hunks:
             self.query_one(f"#hunk-{new}").scroll_visible()
+        self.query_one(StatusBar).refresh()
 
     def watch_selected_line(self, new):
         self._update_line_highlight(new)
@@ -341,6 +406,15 @@ class BurrowApp(App):
             for i in range(compose._first_line_index, compose._last_line_index + 1):
                 self.query_one(f"#hunk-{compose._hunk_index}-line-{i}").add_class("commented")
             self.mount(CommentBlock(comment), after=compose)
+            self.query_one(StatusBar).refresh()
         compose.remove()
         self.composing = None
         self.query_one("#diff-view").focus()
+
+    def action_help(self):
+        overlays = self.screen.query(HelpOverlay)
+        if overlays:
+            overlays.first().remove()
+        else:
+            self.mount(HelpOverlay())
+

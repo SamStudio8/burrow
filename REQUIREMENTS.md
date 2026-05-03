@@ -313,6 +313,15 @@ flowchart TD
 
 ---
 
+#### SCN-TUI-STATUSBAR: Review status bar
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| — | `tui-statusbar` | SHALL display a status bar showing the number of files, total hunks, current hunk position, and number of comments. | usability |
+| — | `tui-help` | SHALL display a help overlay listing key bindings when the user presses `?`, and dismiss it on any subsequent key press. | usability |
+
+---
+
 #### SCN-TUI-SUMMARY: User edits the session summary
 
 | Node | Slug | Statement | Tags |

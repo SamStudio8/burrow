@@ -365,6 +365,37 @@ async def test_v_enters_selection_mode_at_current_line(tmp_path):
             assert app.selecting == app.selected_line
 
 
+@pytest.mark.rule("tui-help")
+async def test_question_mark_toggles_help_panel(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            assert len(app.screen.query("HelpOverlay")) == 0
+            await pilot.press("question_mark")
+            assert len(app.screen.query("HelpOverlay")) == 1
+            await pilot.press("question_mark")
+            assert len(app.screen.query("HelpOverlay")) == 0
+
+
+@pytest.mark.rule("tui-statusbar")
+async def test_statusbar_shows_review_summary(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            bar = str(app.screen.query_one("StatusBar").render())
+            assert "2" in bar   # 2 files
+            assert "3" in bar   # 3 hunks
+            assert "1/3" in bar # hunk position
+            assert "0" in bar   # 0 comments
+            await pilot.press("j")
+            await pilot.press("#")
+            await pilot.press("h", "i")
+            await pilot.press("ctrl+j")
+            bar = str(app.screen.query_one("StatusBar").render())
+            assert "1" in bar   # 1 comment
+
+
 @pytest.mark.rule("diff-nav-hunk-highlight")
 async def test_selected_hunk_is_highlighted(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
