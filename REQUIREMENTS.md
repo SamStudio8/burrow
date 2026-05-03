@@ -328,7 +328,7 @@ flowchart TD
 
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
-| — | `summary-edit-tui` | SHALL allow the user to edit the session summary at any time during the TUI session. | usability |
+| — | `summary-edit-tui` | SHALL open a full-screen modal with a pre-filled TextArea when the user presses `@`, saving on `ctrl+enter` and discarding on `escape`. | usability |
 
 ---
 

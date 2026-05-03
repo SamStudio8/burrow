@@ -10,7 +10,7 @@ from textual.keys import key_to_character
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static, TextArea
-from textual.containers import ScrollableContainer
+from textual.containers import ScrollableContainer, Vertical
 from unidiff import PatchSet
 
 
@@ -81,6 +81,18 @@ class DiffLine(Static):
     }
     DiffLine.commented {
         background: $accent 10%;
+    }
+    """
+
+
+class ComposeHint(Static):
+    DEFAULT_CSS = """
+    ComposeHint {
+        height: 1;
+        color: $text-muted;
+        padding: 0 1;
+        margin-bottom: 1;
+        text-align: right;
     }
     """
 
@@ -239,6 +251,60 @@ class HelpOverlay(Widget):
         self.remove()
 
 
+class SummaryModal(ModalScreen):
+    DEFAULT_CSS = """
+    SummaryModal {
+        align: center middle;
+    }
+    SummaryModal #summary-container {
+        width: 80;
+        height: auto;
+        border: solid $accent;
+        background: $surface;
+    }
+    SummaryModal #summary-title {
+        background: $accent;
+        color: $text;
+        padding: 0 1;
+        height: 1;
+    }
+    SummaryModal #summary-hint {
+        color: $text-muted;
+        padding: 0 1;
+        height: 1;
+    }
+    SummaryModal TextArea {
+        height: 16;
+        border: none;
+    }
+    SummaryModal TextArea:focus {
+        border: none;
+    }
+    """
+
+    def __init__(self, summary):
+        super().__init__()
+        self._summary = summary
+
+    def compose(self):
+        with Vertical(id="summary-container"):
+            yield Static("Edit session summary", id="summary-title")
+            yield TextArea(self._summary)
+            #todo use the hint
+            yield Static("ctrl+enter  save    esc  cancel", id="summary-hint")
+
+    def on_mount(self):
+        self.query_one(TextArea).focus()
+
+    def _on_key(self, event):
+        if event.key == "ctrl+j":
+            event.stop()
+            self.dismiss(self.query_one(TextArea).text)
+        elif event.key == "escape":
+            event.stop()
+            self.dismiss(None)
+
+
 class StaleSessionModal(ModalScreen):
     DEFAULT_CSS = """
     StaleSessionModal {
@@ -293,6 +359,7 @@ class BurrowApp(App):
         Binding("v", "select", "Select"),
         Binding("#", "comment", "Comment"),
         Binding("question_mark", "help", "Help"),
+        Binding("at", "summary", "Summary"),
     ]
 
     selected_hunk = reactive(0)
@@ -453,9 +520,12 @@ class BurrowApp(App):
             first_line_index=min(self.selected_line, last_line_index),
             last_line_index=last_line_index,
         )
+        hint = ComposeHint("ctrl+enter  submit    esc  cancel")
         self.mount(compose, after=anchor_widget)
+        self.mount(hint, after=compose)
 
     def action_cancel_compose(self):
+        self.screen.query(ComposeHint).remove()
         widgets = self.screen.query(ComposeWidget)
         if widgets:
             widgets.first().remove()
@@ -484,6 +554,7 @@ class BurrowApp(App):
                 self.query_one(f"#hunk-{compose._hunk_index}-line-{i}").add_class("commented")
             self.mount(CommentBlock(comment), after=compose)
             self.query_one(StatusBar).refresh()
+        self.screen.query(ComposeHint).remove()
         compose.remove()
         self.composing = None
         self.query_one("#diff-view").focus()
@@ -501,6 +572,14 @@ class BurrowApp(App):
             self.query_one(StatusBar).refresh()
         else:
             self.exit()
+
+    def action_summary(self):
+        self.push_screen(SummaryModal(self.request.summary), self._on_summary_result)
+
+    def _on_summary_result(self, summary):
+        if summary is not None:
+            self.request.summary = summary.strip()
+            self.request.save()
 
     def action_help(self):
         overlays = self.screen.query(HelpOverlay)

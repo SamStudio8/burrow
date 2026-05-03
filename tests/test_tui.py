@@ -2,7 +2,8 @@ import pytest
 from unittest.mock import patch
 from textual.widgets import Static
 from burrow.models import Comment, Request
-from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal
+from textual.widgets import TextArea
+from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal
 
 
 @pytest.mark.rule("diff-source")
@@ -437,6 +438,48 @@ async def test_stale_session_modal_shown_when_comment_file_missing(tmp_path):
             await pilot.pause()
             bar = str(app.screen.query_one("StatusBar").render())
             assert "0 comments" in bar
+
+
+@pytest.mark.rule("summary-edit-tui")
+async def test_at_opens_summary_modal(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="initial", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("@")
+            assert any(isinstance(s, SummaryModal) for s in app.screen_stack)
+
+
+@pytest.mark.rule("summary-edit-tui")
+async def test_summary_modal_prefilled_with_current_summary(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="initial", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("@")
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
+            assert modal.query_one(TextArea).text == "initial"
+
+
+@pytest.mark.rule("summary-edit-tui")
+async def test_ctrl_enter_saves_summary(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("@")
+            await pilot.press("n", "e", "w")
+            await pilot.press("ctrl+j")
+            assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
+            assert app.request.summary == "new"
+
+
+@pytest.mark.rule("summary-edit-tui")
+async def test_escape_discards_summary_edit(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="old", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("@")
+            await pilot.press("escape")
+            assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
+            assert app.request.summary == "old"
 
 
 @pytest.mark.rule("diff-nav-hunk-highlight")
