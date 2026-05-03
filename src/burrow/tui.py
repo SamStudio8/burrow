@@ -2,8 +2,10 @@ import subprocess
 from dataclasses import dataclass
 
 from rich.text import Text
+from burrow.models import Request
 from textual.app import App
 from textual.binding import Binding
+from textual.screen import ModalScreen
 from textual.keys import key_to_character
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -119,10 +121,18 @@ class ComposeWidget(TextArea):
         height: auto;
         min-height: 2;
         border: solid $accent;
-        margin: 0 1;
+    }
+    ComposeWidget:focus {
+        border: solid $accent;
     }
     ComposeWidget > .text-area--cursor-line {
         background: transparent;
+    }
+    ComposeWidget.error {
+        border: solid $error;
+    }
+    ComposeWidget.error:focus {
+        border: solid $error;
     }
     """
 
@@ -229,6 +239,33 @@ class HelpOverlay(Widget):
         self.remove()
 
 
+class StaleSessionModal(ModalScreen):
+    DEFAULT_CSS = """
+    StaleSessionModal {
+        align: center middle;
+    }
+    StaleSessionModal > Static {
+        background: $surface;
+        border: solid $error;
+        padding: 1 2;
+        height: auto;
+        width: auto;
+    }
+    """
+
+    def compose(self):
+        yield Static(
+            "Session has comments that no longer map to valid file locations.\n"
+            "Discard existing request and start new session?\n\n"
+            "  y  Start new session\n"
+            "  n  Quit"
+        )
+
+    def _on_key(self, event):
+        event.stop()
+        self.dismiss(event.key == "y")
+
+
 class BurrowHeader(Static):
     DEFAULT_CSS = """
     BurrowHeader {
@@ -278,9 +315,45 @@ class BurrowApp(App):
                     yield HunkWidget(hunk, i)
         yield StatusBar(self)
 
+    def _locate_comment(self, comment):
+        for hunk_idx, hunk in enumerate(self.hunks):
+            if hunk.file != comment.file:
+                continue
+            target_line = hunk.target_start
+            for line_idx, line in enumerate(hunk.lines):
+                if target_line == comment.last_line:
+                    first_line_idx = line_idx - (comment.last_line - comment.first_line)
+                    return hunk_idx, max(first_line_idx, 0), line_idx
+                if not line.startswith("-"):
+                    target_line += 1
+        return None
+
+    def _comment_is_valid(self, comment):
+        path = self.request.repo_root / comment.file
+        if not path.is_file():
+            return False
+        line_count = len(path.read_text().splitlines())
+        return comment.last_line <= line_count
+
+    def _load_existing_comments(self):
+        for comment in self.request.comments:
+            location = self._locate_comment(comment)
+            if location is None:
+                continue
+            hunk_idx, first_line_idx, last_line_idx = location
+            for i in range(first_line_idx, last_line_idx + 1):
+                self.query_one(f"#hunk-{hunk_idx}-line-{i}").add_class("commented")
+            anchor = self.query_one(f"#hunk-{hunk_idx}-line-{last_line_idx}")
+            self.mount(CommentBlock(comment), after=anchor)
+
     def on_mount(self):
         self._update_highlight(0)
         self._update_line_highlight(0)
+        stale = any(not self._comment_is_valid(c) for c in self.request.comments)
+        if stale:
+            self.push_screen(StaleSessionModal(), self._on_stale_result)
+            return
+        self._load_existing_comments()
 
     def watch_selected_hunk(self, old, new):
         if self.hunks:
@@ -395,7 +468,11 @@ class BurrowApp(App):
             return
         compose = widgets.first()
         body = compose.text.strip()
-        if body and self.composing is not None:
+        if not body:
+            compose.add_class("error")
+            self.set_timer(0.4, lambda: compose.remove_class("error"))
+            return
+        if self.composing is not None:
             comment = self.request.add_comment(
                 file=self.composing.file,
                 first_line=self.composing.first_line,
@@ -410,6 +487,20 @@ class BurrowApp(App):
         compose.remove()
         self.composing = None
         self.query_one("#diff-view").focus()
+
+    def _on_stale_result(self, start_new):
+        if start_new:
+            burrow_dir = self.request.repo_root / ".burrow"
+            (burrow_dir / "request.json").unlink(missing_ok=True)
+            response = burrow_dir / "response.json"
+            if response.exists():
+                response.unlink()
+            self.request = Request(summary=self.request.summary, repo_root=self.request.repo_root)
+            self.request.save()
+            self._load_existing_comments()
+            self.query_one(StatusBar).refresh()
+        else:
+            self.exit()
 
     def action_help(self):
         overlays = self.screen.query(HelpOverlay)

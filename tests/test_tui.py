@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import patch
 from textual.widgets import Static
-from burrow.models import Request
-from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line
+from burrow.models import Comment, Request
+from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal
 
 
 @pytest.mark.rule("diff-source")
@@ -314,6 +314,17 @@ async def test_submitted_comment_renders_inline(tmp_path):
             assert "commented" in app.screen.query_one("#hunk-0-line-1").classes
 
 
+@pytest.mark.rule("comment-empty-notice")
+async def test_empty_submit_flashes_error_class(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press("#")
+            await pilot.press("ctrl+j")
+            widget = app.screen.query_one("ComposeWidget")
+            assert "error" in widget.classes
+
+
 @pytest.mark.rule("comment-compose-cancel")
 async def test_escape_cancels_compose(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
@@ -394,6 +405,38 @@ async def test_statusbar_shows_review_summary(tmp_path):
             await pilot.press("ctrl+j")
             bar = str(app.screen.query_one("StatusBar").render())
             assert "1" in bar   # 1 comment
+
+
+@pytest.mark.rule("tui-load-comments")
+async def test_existing_comments_rendered_on_startup(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    request.add_comment(file="foo.py", first_line=2, last_line=2, body="existing comment")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            blocks = app.screen.query("CommentBlock")
+            assert len(blocks) == 1
+            assert "existing comment" in str(blocks.first().render())
+            assert "commented" in app.screen.query_one("#hunk-0-line-1").classes
+
+
+@pytest.mark.rule("tui-stale-session")
+async def test_stale_session_modal_shown_when_comment_file_missing(tmp_path):
+    request = Request(summary="", repo_root=tmp_path)
+    request.comments.append(Comment(file="gone.py", first_line=1, last_line=1, body="orphaned"))
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            assert any(isinstance(s, StaleSessionModal) for s in app.screen_stack)
+            old_id = request.id
+            await pilot.press("y")
+            assert not any(isinstance(s, StaleSessionModal) for s in app.screen_stack)
+            assert len(app.request.comments) == 0
+            assert app.request.id != old_id
+            await pilot.pause()
+            bar = str(app.screen.query_one("StatusBar").render())
+            assert "0 comments" in bar
 
 
 @pytest.mark.rule("diff-nav-hunk-highlight")

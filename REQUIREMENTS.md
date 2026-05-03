@@ -309,7 +309,7 @@ flowchart TD
 | compose | `comment-compose-cancel` | SHALL discard the composed comment and remove the input when the user presses `escape`. | usability |
 | compose | `comment-compose-expand` | SHALL grow the compose input to fit its content as the user types, with no internal scrollbar. | usability |
 | attach | `comment-attach-tui` | SHALL attach the comment to the current session and persist it, equivalent to `burrow c`. | data |
-| error | `comment-error-tui` | SHALL display validation errors inline without closing the TUI. | usability, error |
+| error | `comment-empty-notice` | SHALL briefly flash the compose input border red when the user attempts to submit an empty comment. | usability, error |
 
 ---
 
@@ -318,6 +318,8 @@ flowchart TD
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
 | — | `tui-statusbar` | SHALL display a status bar showing the number of files, total hunks, current hunk position, and number of comments. | usability |
+| — | `tui-load-comments` | SHALL render any existing comments from the session inline in the diff view on startup. | data, usability |
+| — | `tui-stale-session` | SHALL display a modal dialog on startup if any session comment cannot be mapped to an existing file or line range, offering to end the session (equivalent to `burrow end`) or quit. | error, usability |
 | — | `tui-help` | SHALL display a help overlay listing key bindings when the user presses `?`, and dismiss it on any subsequent key press. | usability |
 
 ---
