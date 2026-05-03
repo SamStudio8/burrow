@@ -332,6 +332,19 @@ flowchart TD
 
 ---
 
+#### SCN-TUI-RESPONSE: TUI loads and renders agent response
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| — | `response-load-tui` | SHALL load `.burrow/response.json` on startup if it exists, and reload it automatically whenever it is created or modified while the TUI is running, updating all matching CommentBlocks in-place with the reply and status. | data, usability |
+| — | `comment-nav` | SHALL navigate to the next or previous comment when the user presses `n` or `N`, updating the selected hunk and line to the comment's anchor, in visual order (by hunk then line position, not creation order). | usability |
+| — | `comment-nav-highlight` | SHALL highlight all lines in the comment's anchor range when navigating with `n` or `p`. | usability |
+| — | `comment-nav-visible` | SHALL scroll the viewport so that the first anchor line and the CommentBlock are both visible when navigating with `n` or `p`. | usability |
+| — | `response-comment-reply` | SHALL render the reply text beneath the comment body in each comment when a response is loaded. | usability |
+| — | `response-comment-status-colour` | SHALL colour the left border of each comment according to comment status: `todo` → grey, `done` → green, `partial` → purple, `refused` → red, `blocked` → yellow. | usability |
+
+---
+
 ## Tag Glossary
 
 ### Standard tags

@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import patch
 from textual.widgets import Static
@@ -465,6 +466,208 @@ async def test_escape_discards_summary_edit(tmp_path):
             await pilot.press("escape")
             assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
             assert app.request.summary == "old"
+
+
+@pytest.mark.rule("response-load-tui")
+async def test_existing_response_loaded_on_startup(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    request.save()
+    comment = request.add_comment(file="foo.py", first_line=2, last_line=2, body="a comment")
+    request.save()
+    response_data = {
+        "id": "a1b2c3d4-0000-0000-0000-000000000001",
+        "request_id": str(request.id),
+        "created_at": "2026-04-29T21:00:00+00:00",
+        "summary": "",
+        "agent_metadata": {"name": "test", "version": "0"},
+        "comments": [{
+            "id": str(comment.id),
+            "file": comment.file,
+            "first_line": comment.first_line,
+            "last_line": comment.last_line,
+            "body": comment.body,
+            "status": "done",
+            "reply": "fixed it",
+        }],
+    }
+    (tmp_path / ".burrow" / "response.json").write_text(json.dumps(response_data))
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            block = app.screen.query_one("CommentBlock")
+            assert "fixed it" in str(block.render())
+            assert "status-done" in block.classes
+
+
+@pytest.mark.rule("response-load-tui")
+async def test_response_watch_loads_on_file_creation(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    request.save()
+    comment = request.add_comment(file="foo.py", first_line=2, last_line=2, body="a comment")
+    request.save()
+    response_data = {
+        "id": "a1b2c3d4-0000-0000-0000-000000000001",
+        "request_id": str(request.id),
+        "created_at": "2026-04-29T21:00:00+00:00",
+        "summary": "",
+        "agent_metadata": {"name": "test", "version": "0"},
+        "comments": [{
+            "id": str(comment.id),
+            "file": comment.file,
+            "first_line": comment.first_line,
+            "last_line": comment.last_line,
+            "body": comment.body,
+            "status": "done",
+            "reply": "fixed it",
+        }],
+    }
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            (tmp_path / ".burrow" / "response.json").write_text(json.dumps(response_data))
+            await pilot.pause(delay=0.5)
+            block = app.screen.query_one("CommentBlock")
+            assert "fixed it" in str(block.render())
+            assert "status-done" in block.classes
+
+
+@pytest.mark.rule("response-comment-reply")
+async def test_comment_block_renders_reply_when_present(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    comment = request.add_comment(file="foo.py", first_line=2, last_line=2, body="a comment")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            block = app.screen.query_one("CommentBlock")
+            assert "a comment" in str(block.render())
+            assert "a reply" not in str(block.render())
+            block.update_reply("a reply")
+            assert "a reply" in str(block.render())
+
+
+@pytest.mark.rule("response-comment-status-colour")
+async def test_comment_block_border_colour_reflects_status(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    request.add_comment(file="foo.py", first_line=2, last_line=2, body="a comment")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            block = app.screen.query_one("CommentBlock")
+            assert "status-todo" in block.classes
+            block.update_status("done")
+            assert "status-done" in block.classes
+            assert "status-todo" not in block.classes
+
+
+@pytest.mark.rule("comment-nav")
+async def test_n_navigates_comments_in_visual_order(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    # Add comments in reverse visual order
+    request.add_comment(file="foo.py", first_line=2, last_line=2, body="second")
+    request.add_comment(file="foo.py", first_line=1, last_line=1, body="first")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            await pilot.press("n")
+            # should land on visual first (foo.py line 1, index 0), not creation first (line 2)
+            assert app.selected_line == 0
+            await pilot.press("n")
+            # second n lands on visual second (foo.py line 2, index 1)
+            assert app.selected_line == 1
+
+
+@pytest.mark.rule("comment-nav")
+async def test_n_navigates_to_comment_hunk_and_line(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    request.add_comment(file="foo.py", first_line=1, last_line=1, body="first")
+    request.add_comment(file="foo.py", first_line=2, last_line=2, body="second")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            assert app._comment_index == -1
+            await pilot.press("n")
+            assert app._comment_index == 0
+            assert app.selected_hunk == 0
+            assert app.selected_line == 0  # line index of foo.py line 1 in hunk 0
+            await pilot.press("n")
+            assert app._comment_index == 1
+            assert app.selected_line == 1  # line index of foo.py line 2 in hunk 0
+            await pilot.press("n")
+            assert app._comment_index == 1  # clamps at end
+
+
+@pytest.mark.rule("comment-nav")
+async def test_p_navigates_to_comment_hunk_and_line(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    request.add_comment(file="foo.py", first_line=1, last_line=1, body="first")
+    request.add_comment(file="foo.py", first_line=2, last_line=2, body="second")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            await pilot.press("n")
+            await pilot.press("n")
+            assert app._comment_index == 1
+            await pilot.press("shift+n")
+            assert app._comment_index == 0
+            assert app.selected_hunk == 0
+            assert app.selected_line == 0  # line index of foo.py line 1 in hunk 0
+            await pilot.press("shift+n")
+            assert app._comment_index == -1  # clamps before first
+
+
+@pytest.mark.rule("comment-nav-visible")
+async def test_comment_nav_scrolls_first_anchor_line_to_top(tmp_path):
+    # Build a diff long enough that the comment anchor starts off-screen
+    n_context = 40
+    file_lines = [f"line{i}\n" for i in range(1, n_context + 10)]
+    (tmp_path / "foo.py").write_text("".join(file_lines))
+    context = "".join(f" line{i}\n" for i in range(1, n_context + 1))
+    tall_diff = (
+        "diff --git a/foo.py b/foo.py\n"
+        "index 0000001..0000002 100644\n"
+        "--- a/foo.py\n"
+        "+++ b/foo.py\n"
+        f"@@ -1,{n_context + 1} +1,{n_context + 2} @@\n"
+        + context
+        + f"+newline\n"
+        + f" line{n_context + 1}\n"
+    )
+    request = Request(summary="", repo_root=tmp_path)
+    # anchor is near the bottom of the hunk — will be off-screen in a small terminal
+    request.add_comment(file="foo.py", first_line=n_context, last_line=n_context + 1, body="bottom comment")
+    with patch("burrow.tui.get_diff", return_value=tall_diff):
+        app = BurrowApp(request=request)
+        async with app.run_test(size=(120, 10)) as pilot:
+            await pilot.press("n")
+            await pilot.pause(delay=0.2)
+            diff_view = app.screen.query_one("#diff-view")
+            first_line = app.screen.query_one("#hunk-0-line-39")  # line index n_context-1
+            # virtual_region.y is absolute position in scroll content; scroll_y is viewport top
+            # difference should be near 0 if the line is scrolled to the top of the viewport
+            line_top_in_viewport = first_line.virtual_region.y - diff_view.scroll_y
+            assert 0 <= line_top_in_viewport <= 4
+
+
+@pytest.mark.rule("comment-nav-highlight")
+async def test_comment_nav_highlights_anchor_lines(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    # range comment: foo.py lines 1-2 → hunk 0 line indices 0-1
+    request.add_comment(file="foo.py", first_line=1, last_line=2, body="range comment")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            await pilot.press("n")
+            assert "selected" in app.screen.query_one("#hunk-0-line-0").classes
+            assert "selected" in app.screen.query_one("#hunk-0-line-1").classes
+            assert "selected" not in app.screen.query_one("#hunk-0-line-2").classes
 
 
 @pytest.mark.rule("diff-nav-hunk-highlight")

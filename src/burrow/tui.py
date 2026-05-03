@@ -2,7 +2,7 @@ import subprocess
 from dataclasses import dataclass
 
 from rich.text import Text
-from burrow.models import Request
+from burrow.models import Request, Response
 from textual.app import App
 from textual.binding import Binding
 from textual.screen import ModalScreen
@@ -11,7 +11,9 @@ from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Static, TextArea
 from textual.containers import ScrollableContainer, Vertical
+from textual.worker import Worker
 from unidiff import PatchSet
+from watchfiles import awatch
 
 
 def colour_line(line):
@@ -76,11 +78,11 @@ class DiffLine(Static):
     DiffLine {
         height: 1;
     }
-    DiffLine.selected {
-        background: $accent 30%;
-    }
     DiffLine.commented {
-        background: $accent 10%;
+        background: white 15%;
+    }
+    DiffLine.selected {
+        background: white 25%;
     }
     """
 
@@ -105,10 +107,10 @@ class HunkWidget(Static):
         height: auto;
     }
     HunkWidget.selected {
-        border-left: thick $accent;
+        border-left: thick $primary;
     }
     HunkWidget.selected HunkHeader {
-        background: $accent;
+        background: $primary;
         color: $text;
     }
     """
@@ -195,22 +197,50 @@ class StatusBar(Static):
         return f"{n_files} files  {n_hunks} hunks  hunk {pos}  {n_comments} comments"
 
 
+STATUS_COLOURS = {
+    "todo": "#808080",
+    "done": "#00aa00",
+    "partial": "#aa00aa",
+    "refused": "#aa0000",
+    "blocked": "#aaaa00",
+}
+
+
 class CommentBlock(Static):
     DEFAULT_CSS = """
     CommentBlock {
-        border-left: thick $accent 40%;
         padding: 0 1;
         color: $text-muted;
         height: auto;
         margin-bottom: 1;
     }
+    CommentBlock.status-todo    { border-left: thick #808080; }
+    CommentBlock.status-done    { border-left: thick #00aa00; }
+    CommentBlock.status-partial { border-left: thick #aa00aa; }
+    CommentBlock.status-refused { border-left: thick #aa0000; }
+    CommentBlock.status-blocked { border-left: thick #aaaa00; }
     """
 
     def __init__(self, comment):
         super().__init__()
         self._comment = comment
+        self._reply = comment.reply
+
+    def on_mount(self):
+        self.update_status(self._comment.status)
+
+    def update_status(self, status):
+        for s in STATUS_COLOURS:
+            self.remove_class(f"status-{s}")
+        self.add_class(f"status-{status}")
+
+    def update_reply(self, reply):
+        self._reply = reply
+        self.refresh()
 
     def render(self):
+        if self._reply:
+            return f"{self._comment.body}\n\n{self._reply}"
         return self._comment.body
 
 
@@ -359,6 +389,8 @@ class BurrowApp(App):
         Binding("k", "prev_line", "Prev line"),
         Binding("v", "select", "Select"),
         Binding("#", "comment", "Comment"),
+        Binding("n", "next_comment", "Next comment"),
+        Binding("shift+n", "prev_comment", "Prev comment"),
         Binding("question_mark", "help", "Help"),
         Binding("at", "summary", "Summary"),
     ]
@@ -372,6 +404,8 @@ class BurrowApp(App):
         self.hunks = parse_diff(get_diff(request.repo_root))
         self.composing = None
         self.selecting = None
+        self._comment_blocks = {}  # comment id -> CommentBlock
+        self._comment_index = -1
 
     def compose(self):
         yield BurrowHeader()
@@ -403,7 +437,8 @@ class BurrowApp(App):
         line_count = len(path.read_text().splitlines())
         return comment.last_line <= line_count
 
-    def _load_existing_comments(self):
+    def _load_existing_comments(self, response=None):
+        response_by_id = {c.id: c for c in response.comments} if response else {}
         for comment in self.request.comments:
             location = self._locate_comment(comment)
             if location is None:
@@ -412,7 +447,17 @@ class BurrowApp(App):
             for i in range(first_line_idx, last_line_idx + 1):
                 self.query_one(f"#hunk-{hunk_idx}-line-{i}").add_class("commented")
             anchor = self.query_one(f"#hunk-{hunk_idx}-line-{last_line_idx}")
-            self.mount(CommentBlock(comment), after=anchor)
+            responded = response_by_id.get(comment.id, comment)
+            block = CommentBlock(responded)
+            self._comment_blocks[comment.id] = block
+            self.mount(block, after=anchor)
+
+    def load_response(self, response):
+        for comment in response.comments:
+            block = self._comment_blocks[comment.id]
+            block.update_status(comment.status)
+            if comment.reply:
+                block.update_reply(comment.reply)
 
     def on_mount(self):
         self._update_highlight(0)
@@ -421,7 +466,32 @@ class BurrowApp(App):
         if stale:
             self.push_screen(StaleSessionModal(), self._on_stale_result)
             return
-        self._load_existing_comments()
+        response = self._try_load_response()
+        self._load_existing_comments(response)
+        self.run_worker(self._watch_response(), exclusive=True)
+
+    def _try_load_response(self):
+        response_path = self.request.repo_root / ".burrow" / "response.json"
+        if not response_path.exists():
+            return None
+        try:
+            return Response.load(response_path, self.request)
+        except (ValueError, KeyError):
+            return None
+
+    async def _watch_response(self):
+        burrow_dir = self.request.repo_root / ".burrow"
+        if not burrow_dir.is_dir():
+            return
+        async for _ in awatch(burrow_dir):
+            response_path = burrow_dir / "response.json"
+            if not response_path.exists():
+                continue
+            try:
+                response = Response.load(response_path, self.request)
+            except (ValueError, KeyError):
+                continue
+            self.load_response(response)
 
     def watch_selected_hunk(self, old, new):
         if self.hunks:
@@ -553,7 +623,9 @@ class BurrowApp(App):
             self.request.save()
             for i in range(compose._first_line_index, compose._last_line_index + 1):
                 self.query_one(f"#hunk-{compose._hunk_index}-line-{i}").add_class("commented")
-            self.mount(CommentBlock(comment), after=compose)
+            block = CommentBlock(comment)
+            self._comment_blocks[comment.id] = block
+            self.mount(block, after=compose)
             self.query_one(StatusBar).refresh()
         self.screen.query(ComposeHint).remove()
         compose.remove()
@@ -573,6 +645,49 @@ class BurrowApp(App):
             self.query_one(StatusBar).refresh()
         else:
             self.exit()
+
+    def _sorted_comment_ids(self):
+        def sort_key(comment_id):
+            comment = next(c for c in self.request.comments if c.id == comment_id)
+            location = self._locate_comment(comment)
+            return location[:2] if location else (999999, 999999)
+        return sorted(self._comment_blocks.keys(), key=sort_key)
+
+    def _navigate_to_comment(self, index):
+        comment_ids = self._sorted_comment_ids()
+        comment_id = comment_ids[index]
+        comment = next(c for c in self.request.comments if c.id == comment_id)
+        location = self._locate_comment(comment)
+        if location is None:
+            return
+        hunk_idx, first_line_idx, last_line_idx = location
+        # Update hunk highlight without triggering the watcher's scroll side-effect
+        self._update_highlight(hunk_idx)
+        self.set_reactive(BurrowApp.selected_hunk, hunk_idx)
+        self.query_one(StatusBar).refresh()
+        # Set selection range covering the full anchor
+        self.set_reactive(BurrowApp.selected_line, last_line_idx)
+        self.selecting = first_line_idx
+        self._update_selection_highlight()
+        # Scroll so first anchor line is at top, revealing anchor + block below
+        first_line = self.query_one(f"#hunk-{hunk_idx}-line-{first_line_idx}")
+        self.call_after_refresh(
+            self.query_one("#diff-view").scroll_to_widget, first_line, top=True
+        )
+
+    def action_next_comment(self):
+        if not self._comment_blocks:
+            return
+        self._comment_index = min(self._comment_index + 1, len(self._comment_blocks) - 1)
+        self._navigate_to_comment(self._comment_index)
+
+    def action_prev_comment(self):
+        if not self._comment_blocks:
+            return
+        self._comment_index = max(self._comment_index - 1, -1)
+        if self._comment_index >= 0:
+            self._navigate_to_comment(self._comment_index)
+
 
     def action_summary(self):
         self.push_screen(SummaryModal(self.request.summary), self._on_summary_result)
