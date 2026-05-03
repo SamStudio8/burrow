@@ -272,6 +272,7 @@ class SummaryModal(ModalScreen):
         color: $text-muted;
         padding: 0 1;
         height: 1;
+        text-align: right;
     }
     SummaryModal TextArea {
         height: 16;
@@ -297,7 +298,7 @@ class SummaryModal(ModalScreen):
         self.query_one(TextArea).focus()
 
     def _on_key(self, event):
-        if event.key == "ctrl+j":
+        if event.key == "ctrl+j":  # ctrl+enter in most terminals
             event.stop()
             self.dismiss(self.query_one(TextArea).text)
         elif event.key == "escape":

@@ -441,30 +441,15 @@ async def test_stale_session_modal_shown_when_comment_file_missing(tmp_path):
 
 
 @pytest.mark.rule("summary-edit-tui")
-async def test_at_opens_summary_modal(tmp_path):
+async def test_summary_modal_open_prefilled_and_saves(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=Request(summary="initial", repo_root=tmp_path))
         async with app.run_test() as pilot:
             await pilot.press("@")
             assert any(isinstance(s, SummaryModal) for s in app.screen_stack)
-
-
-@pytest.mark.rule("summary-edit-tui")
-async def test_summary_modal_prefilled_with_current_summary(tmp_path):
-    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        app = BurrowApp(request=Request(summary="initial", repo_root=tmp_path))
-        async with app.run_test() as pilot:
-            await pilot.press("@")
             modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert modal.query_one(TextArea).text == "initial"
-
-
-@pytest.mark.rule("summary-edit-tui")
-async def test_ctrl_enter_saves_summary(tmp_path):
-    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
-        async with app.run_test() as pilot:
-            await pilot.press("@")
+            modal.query_one(TextArea).clear()
             await pilot.press("n", "e", "w")
             await pilot.press("ctrl+j")
             assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
