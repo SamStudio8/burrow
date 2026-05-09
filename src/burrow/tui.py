@@ -970,7 +970,7 @@ class BurrowApp(App):
             response = burrow_dir / "response.json"
             if response.exists():
                 response.unlink()
-            self.request = Request(summary=self.request.summary, repo_root=self.request.repo_root)
+            self.request = Request(summary="", repo_root=self.request.repo_root)
             self.request.save()
             self._load_existing_comments()
             self.query_one(StatusBar).refresh()
