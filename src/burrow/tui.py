@@ -379,6 +379,35 @@ class BurrowHeader(Static):
         return "🐇 burrow"
 
 
+class ErrorModal(ModalScreen):
+    DEFAULT_CSS = """
+    ErrorModal {
+        align: center middle;
+    }
+    ErrorModal > Static {
+        background: $surface;
+        border: solid $error;
+        padding: 1 2;
+        height: auto;
+        width: auto;
+    }
+    """
+
+    def __init__(self, message):
+        super().__init__()
+        self._message = message
+
+    def compose(self):
+        yield Static(self._message + "\n\n  ctrl+enter  Try again    esc  Cancel")
+
+    def _on_key(self, event):
+        event.stop()
+        if event.key == "ctrl+j":
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
+
+
 class WaitingModal(ModalScreen):
     DEFAULT_CSS = """
     WaitingModal {
@@ -773,7 +802,19 @@ class BurrowApp(App):
     async def _run_dispatch(self):
         self.push_screen(WaitingModal())
         returncode = await run_agent(self.request)
-        self.pop_screen()  # dismiss WaitingModal
+        self.pop_screen()
+        if returncode != 0:
+            self.push_screen(ErrorModal(f"Agent exited with code {returncode}."), self._on_error_result)
+            return
+        response = self._try_load_response()
+        if response is None:
+            self.push_screen(ErrorModal("Agent exited successfully but response.json is missing or invalid."), self._on_error_result)
+            return
+        self.load_response(response)
+
+    def _on_error_result(self, retry):
+        if retry:
+            self.run_worker(self._run_dispatch(), exclusive=True)
 
     def action_summary(self):
         self.push_screen(SummaryModal(self.request.summary), self._on_summary_result)
