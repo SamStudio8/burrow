@@ -22,6 +22,24 @@ def test_get_diff_returns_staged_and_unstaged(tmp_path, monkeypatch):
     assert result == fake_diff
 
 
+@pytest.mark.rule("diff-source")
+def test_get_diff_falls_back_to_last_commit_when_clean(tmp_path):
+    fake_diff = "diff --git a/foo.py b/foo.py\n--- a/foo.py\n+++ b/foo.py\n"
+    def fake_run(cmd, **kwargs):
+        result = type("R", (), {})()
+        if "HEAD~1" in cmd:
+            result.stdout = fake_diff
+        else:
+            result.stdout = ""
+        result.returncode = 0
+        return result
+    with patch("subprocess.run", side_effect=fake_run) as mock_run:
+        result = get_diff(tmp_path)
+    assert result == fake_diff
+    calls = [c.args[0] for c in mock_run.call_args_list]
+    assert any("HEAD~1" in c for c in calls)
+
+
 SAMPLE_DIFF = """\
 diff --git a/foo.py b/foo.py
 index 0000001..0000002 100644

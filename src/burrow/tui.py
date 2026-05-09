@@ -60,6 +60,14 @@ def get_diff(repo_root):
         capture_output=True,
         text=True,
     )
+    if result.stdout:
+        return result.stdout
+    result = subprocess.run(
+        ["git", "diff", "HEAD~1", "HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
     return result.stdout
 
 

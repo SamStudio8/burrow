@@ -252,7 +252,7 @@ flowchart TD
 
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
-| diff | `diff-source` | SHALL display all uncommitted changes in the repository (staged and unstaged). | data |
+| diff | `diff-source` | SHALL display all uncommitted changes in the repository (staged and unstaged). If there are no uncommitted changes, SHALL fall back to the diff of the last commit (`HEAD~1..HEAD`). | data |
 | hunks | `diff-hunks` | SHALL display all hunks grouped by file. | interface, usability |
 | nav | `diff-nav-next-hunk` | SHALL support navigating to the next hunk. | usability |
 | nav | `diff-nav-prev-hunk` | SHALL support navigating to the previous hunk. | usability |
