@@ -488,6 +488,12 @@ class SummaryModal(ModalScreen):
         height: 3;
         background: transparent;
     }
+    SummaryModal #dispatch-no-comments {
+        height: 1fr;
+        color: $text-muted;
+        content-align: center middle;
+        width: 100%;
+    }
     SummaryModal DataTable {
         height: auto;
     }
@@ -557,6 +563,10 @@ class SummaryModal(ModalScreen):
         self._col_lines = table.add_column("Lines")
         for comment in self._request.comments:
             table.add_row(comment.file, f"{comment.first_line}–{comment.last_line}", key=str(comment.id))
+        if not self._request.comments:
+            table.display = False
+            self.query_one("#dispatch-detail").display = False
+            self.query_one("#dispatch-right").mount(Static("No comments", id="dispatch-no-comments"))
         self._update_detail(0)
         self.query_one("#dispatch-summary", TextArea).focus()
 
@@ -649,6 +659,10 @@ class SummaryModal(ModalScreen):
         self._col_lines = table.add_column("Lines")
         for comment in self._request.comments:
             table.add_row(comment.file, f"{comment.first_line}–{comment.last_line}", key=str(comment.id))
+        if not self._request.comments:
+            table.display = False
+            detail.display = False
+            right.mount(Static("No comments", id="dispatch-no-comments"))
         by_id = {c.id: c for c in response.comments}
         for row_key in table.rows:
             comment_id = uuid.UUID(row_key.value)
