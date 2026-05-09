@@ -175,11 +175,12 @@ class ComposeWidget(TextArea):
 
     def on_mount(self):
         self.show_line_numbers = False
+        self.soft_wrap = True
         self.focus()
 
     def on_text_area_changed(self):
-        lines = self.text.count("\n") + 1
-        self.styles.height = lines + 2  # +2 for border
+        visual_lines = self.wrapped_document.height
+        self.styles.height = visual_lines + 2  # +2 for border
 
     def _on_key(self, event):
         if event.key == "ctrl+j":
