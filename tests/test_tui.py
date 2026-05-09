@@ -182,7 +182,7 @@ async def test_hunk_change_clears_previous_line_selection(tmp_path):
             await pilot.press("j")
             await pilot.press("j")
             assert "selected" in app.screen.query_one("#hunk-0-line-2").classes
-            await pilot.press("]")
+            await pilot.press("l")
             assert "selected" not in app.screen.query_one("#hunk-0-line-2").classes
             assert "selected" in app.screen.query_one("#hunk-1-line-0").classes
 
@@ -195,7 +195,7 @@ async def test_line_resets_on_hunk_change(tmp_path):
             await pilot.press("j")
             await pilot.press("j")
             assert app.selected_line == 2
-            await pilot.press("]")
+            await pilot.press("l")
             assert app.selected_line == 0
 
 
@@ -205,7 +205,7 @@ async def test_next_hunk_advances_selection(tmp_path):
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
             assert app.selected_hunk == 0
-            await pilot.press("]")
+            await pilot.press("l")
             assert app.selected_hunk == 1
 
 
@@ -214,10 +214,10 @@ async def test_prev_hunk_retreats_selection(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
-            await pilot.press("]")
-            await pilot.press("]")
+            await pilot.press("l")
+            await pilot.press("l")
             assert app.selected_hunk == 2
-            await pilot.press("[")
+            await pilot.press("h")
             assert app.selected_hunk == 1
 
 
@@ -226,9 +226,9 @@ async def test_next_hunk_clamps_at_end(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
-            await pilot.press("]")
-            await pilot.press("]")
-            await pilot.press("]")
+            await pilot.press("l")
+            await pilot.press("l")
+            await pilot.press("l")
             assert app.selected_hunk == 2
 
 
@@ -237,7 +237,7 @@ async def test_prev_hunk_clamps_at_start(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
-            await pilot.press("[")
+            await pilot.press("h")
             assert app.selected_hunk == 0
 
 
@@ -366,7 +366,7 @@ async def test_hunk_navigation_discards_selection(tmp_path):
             await pilot.press("v")
             await pilot.press("j")
             assert app.selecting is not None
-            await pilot.press("]")
+            await pilot.press("l")
             assert app.selecting is None
 
 
@@ -919,6 +919,6 @@ async def test_selected_hunk_is_highlighted(tmp_path):
             hunk1 = app.screen.query_one("#hunk-1")
             assert "selected" in hunk0.classes
             assert "selected" not in hunk1.classes
-            await pilot.press("]")
+            await pilot.press("l")
             assert "selected" not in hunk0.classes
             assert "selected" in hunk1.classes

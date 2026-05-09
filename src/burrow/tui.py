@@ -546,8 +546,8 @@ class BurrowApp(App):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("ctrl+c", "quit", "Quit"),
-        Binding("]", "next_hunk", "Next hunk"),
-        Binding("[", "prev_hunk", "Prev hunk"),
+        Binding("l", "next_hunk", "Next hunk"),
+        Binding("h", "prev_hunk", "Prev hunk"),
         Binding("j", "next_line", "Next line"),
         Binding("k", "prev_line", "Prev line"),
         Binding("v", "select", "Select"),
