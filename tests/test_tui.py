@@ -4,7 +4,7 @@ from unittest.mock import patch
 from textual.widgets import Static
 from burrow.models import Comment, Request
 from textual.widgets import TextArea
-from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal, DispatchModal, ErrorModal
+from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryEditModal, SummaryModal, ErrorModal
 
 
 @pytest.mark.rule("diff-source")
@@ -478,13 +478,13 @@ async def test_summary_modal_open_prefilled_and_saves(tmp_path):
         app = BurrowApp(request=Request(summary="initial", repo_root=tmp_path))
         async with app.run_test() as pilot:
             await pilot.press("@")
-            assert any(isinstance(s, SummaryModal) for s in app.screen_stack)
-            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
+            assert any(isinstance(s, SummaryEditModal) for s in app.screen_stack)
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryEditModal))
             assert modal.query_one(TextArea).text == "initial"
             modal.query_one(TextArea).clear()
             await pilot.press("n", "e", "w")
-            await pilot.press(SummaryModal.CONFIRM.key)
-            assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
+            await pilot.press(SummaryEditModal.CONFIRM.key)
+            assert not any(isinstance(s, SummaryEditModal) for s in app.screen_stack)
             assert app.request.summary == "new"
 
 
@@ -494,8 +494,8 @@ async def test_escape_discards_summary_edit(tmp_path):
         app = BurrowApp(request=Request(summary="old", repo_root=tmp_path))
         async with app.run_test() as pilot:
             await pilot.press("@")
-            await pilot.press(SummaryModal.DISMISS.key)
-            assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
+            await pilot.press(SummaryEditModal.DISMISS.key)
+            assert not any(isinstance(s, SummaryEditModal) for s in app.screen_stack)
             assert app.request.summary == "old"
 
 
@@ -711,7 +711,7 @@ async def test_dispatch_modal_has_two_columns_with_datatable(tmp_path):
         app = BurrowApp(request=request)
         async with app.run_test() as pilot:
             await pilot.press(">")
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert modal.query_one(TextArea).text == "my summary"
             table = modal.query_one(DataTable)
             assert table.row_count == 1
@@ -730,15 +730,15 @@ async def test_dispatch_modal_jk_navigate_table_and_update_detail(tmp_path):
         app = BurrowApp(request=request)
         async with app.run_test() as pilot:
             await pilot.press(">")
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             table = modal.query_one(DataTable)
             table.focus()
             await pilot.pause()
-            detail = str(modal.query_one("#dispatch-detail").render())
+            detail = str(modal.query_one("#dispatch-comment-body").render())
             assert "first comment" in detail
             await pilot.press("j")
             await pilot.pause()
-            detail = str(modal.query_one("#dispatch-detail").render())
+            detail = str(modal.query_one("#dispatch-comment-body").render())
             assert "second comment" in detail
 
 
@@ -752,11 +752,11 @@ async def test_dispatch_modal_summary_is_editable_and_saved(tmp_path):
             app = BurrowApp(request=Request(summary="before", repo_root=tmp_path))
             async with app.run_test() as pilot:
                 await pilot.press(">")
-                modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+                modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
                 ta = modal.query_one(TextArea)
                 ta.clear()
                 await pilot.press("a", "f", "t", "e", "r")
-                await pilot.press(DispatchModal.CONFIRM.key)
+                await pilot.press(SummaryModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
                 assert app.request.summary == "after"
 
@@ -770,16 +770,16 @@ async def test_dispatch_modal_shows_spinner_while_waiting(tmp_path):
         async with app.run_test() as pilot:
             spinner_seen = []
             async def fake_run_agent(request):
-                modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+                modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
                 spinner_seen.append(len(modal.query(LoadingIndicator)) > 0)
                 return 0
             with patch("burrow.tui.run_agent", fake_run_agent):
                 await pilot.press(">")
-                await pilot.press(DispatchModal.CONFIRM.key)
+                await pilot.press(SummaryModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
             # spinner was visible during agent run; gone after agent finishes
             assert spinner_seen == [True]
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert len(modal.query(LoadingIndicator)) == 0
             assert modal._state != "waiting"
 
@@ -817,9 +817,9 @@ async def test_dispatch_success_transitions_modal_to_response_state(tmp_path):
         async with app.run_test() as pilot:
             with patch("burrow.tui.run_agent", fake_run_agent):
                 await pilot.press(">")
-                await pilot.press(DispatchModal.CONFIRM.key)
+                await pilot.press(SummaryModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert modal._state == "response"
             # left pane shows agent summary as read-only TextArea
             ta = modal.query_one("#dispatch-summary", TextArea)
@@ -830,8 +830,8 @@ async def test_dispatch_success_transitions_modal_to_response_state(tmp_path):
             table = modal.query_one(DataTable)
             assert table.row_count == 1
             # close modal and check CommentBlock updated
-            await pilot.press(DispatchModal.CLOSE.key)
-            assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
+            await pilot.press(SummaryModal.CLOSE.key)
+            assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
             block = app.screen.query_one("CommentBlock")
             assert "status-done" in block.classes
             assert "fixed it" in str(block.render())
@@ -850,16 +850,16 @@ async def test_retry_keeps_modal_open_and_redispatches(tmp_path):
         async with app.run_test() as pilot:
             with patch("burrow.tui.run_agent", fake_run_agent):
                 await pilot.press(">")
-                await pilot.press(DispatchModal.CONFIRM.key)
+                await pilot.press(SummaryModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-                modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+                modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
                 assert modal._state == "error"
-                await pilot.press(DispatchModal.RETRY.key)
+                await pilot.press(SummaryModal.RETRY.key)
                 await pilot.pause(delay=0.2)
             # modal still open (in error state again), called agent twice
             assert call_count[0] == 2
-            assert any(isinstance(s, DispatchModal) for s in app.screen_stack)
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            assert any(isinstance(s, SummaryModal) for s in app.screen_stack)
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert modal._state == "error"
 
 
@@ -873,13 +873,19 @@ async def test_dispatch_error_transitions_modal_on_nonzero_exit(tmp_path):
         async with app.run_test() as pilot:
             with patch("burrow.tui.run_agent", fake_run_agent):
                 await pilot.press(">")
-                await pilot.press(DispatchModal.CONFIRM.key)
+                assert any(isinstance(s, SummaryModal) for s in app.screen_stack)
+                modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
+                assert modal._state == "compose"
+                await pilot.press(SummaryModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert modal._state == "error"
             hint = str(modal.query_one("#dispatch-hint", Static).render())
             assert "1" in str(modal.query_one("#dispatch-error-msg", Static).render())
-            assert DispatchModal.RETRY.label in hint
+            assert SummaryModal.RETRY.label in hint
+            # dismiss closes the modal from error state
+            await pilot.press(SummaryModal.DISMISS.key)
+            assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
 
 
 @pytest.mark.rule("dispatch-error")
@@ -892,9 +898,9 @@ async def test_dispatch_error_shown_when_response_missing_or_invalid(tmp_path):
         async with app.run_test() as pilot:
             with patch("burrow.tui.run_agent", fake_run_no_response):
                 await pilot.press(">")
-                await pilot.press(DispatchModal.CONFIRM.key)
+                await pilot.press(SummaryModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert modal._state == "error"
 
     request = Request(summary="", repo_root=tmp_path)
@@ -909,51 +915,21 @@ async def test_dispatch_error_shown_when_response_missing_or_invalid(tmp_path):
         async with app.run_test() as pilot:
             with patch("burrow.tui.run_agent", fake_run_bad_response):
                 await pilot.press(">")
-                await pilot.press(DispatchModal.CONFIRM.key)
+                await pilot.press(SummaryModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert modal._state == "error"
 
 
 @pytest.mark.rule("dispatch-confirm")
-async def test_dispatch_modal_confirm_and_dismiss(tmp_path):
-    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        # escape dismisses in compose state
-        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
-        async with app.run_test() as pilot:
-            await pilot.press(">")
-            assert any(isinstance(s, DispatchModal) for s in app.screen_stack)
-            await pilot.press(DispatchModal.DISMISS.key)
-            assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
-
-    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        # ctrl+enter transitions away from compose and keeps modal on screen
-        async def fake_run_agent(request):
-            return 1  # fail so we don't need a real response.json
-        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
-        async with app.run_test() as pilot:
-            with patch("burrow.tui.run_agent", fake_run_agent):
-                await pilot.press(">")
-                modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
-                assert modal._state == "compose"
-                await pilot.press(DispatchModal.CONFIRM.key)
-                await pilot.pause(delay=0.2)
-            # modal still on screen (in error state), was not dismissed
-            assert any(isinstance(s, DispatchModal) for s in app.screen_stack)
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
-            assert modal._state != "compose"
-            # cancel via DISMISS binding closes the modal
-            await pilot.press(DispatchModal.DISMISS.key)
-            assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
-
-
-@pytest.mark.rule("dispatch-invocation")
-async def test_greater_than_opens_dispatch_modal(tmp_path):
+async def test_escape_dismisses_summary_modal_in_compose_state(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
             await pilot.press(">")
-            assert any(isinstance(s, DispatchModal) for s in app.screen_stack)
+            assert any(isinstance(s, SummaryModal) for s in app.screen_stack)
+            await pilot.press(SummaryModal.DISMISS.key)
+            assert not any(isinstance(s, SummaryModal) for s in app.screen_stack)
 
 
 @pytest.mark.rule("diff-nav-hunk-highlight")

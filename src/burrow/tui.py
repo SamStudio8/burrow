@@ -152,6 +152,7 @@ class ComposeWidget(TextArea):
         height: auto;
         min-height: 2;
         border: solid $accent;
+        overflow-y: hidden;
     }
     ComposeWidget:focus {
         border: solid $accent;
@@ -299,37 +300,37 @@ class HelpOverlay(Widget):
         self.remove()
 
 
-class SummaryModal(ModalScreen):
+class SummaryEditModal(ModalScreen):
     CONFIRM = ModalBinding("ctrl+j", "ctrl+enter", "save")
     DISMISS = ModalBinding("escape", "esc", "cancel")
 
     DEFAULT_CSS = """
-    SummaryModal {
+    SummaryEditModal {
         align: center middle;
     }
-    SummaryModal #summary-container {
+    SummaryEditModal #summary-container {
         width: 80;
         height: auto;
         border: solid $accent;
         background: $surface;
     }
-    SummaryModal #summary-title {
+    SummaryEditModal #summary-title {
         background: $accent;
         color: $text;
         padding: 0 1;
         height: 1;
     }
-    SummaryModal #summary-hint {
+    SummaryEditModal #summary-hint {
         color: $text-muted;
         padding: 0 1;
         height: 1;
         text-align: right;
     }
-    SummaryModal TextArea {
+    SummaryEditModal TextArea {
         height: 16;
         border: none;
     }
-    SummaryModal TextArea:focus {
+    SummaryEditModal TextArea:focus {
         border: none;
     }
     """
@@ -432,70 +433,91 @@ class ErrorModal(ModalScreen):
         self.dismiss(event.key == self.CONFIRM.key)
 
 
-class DispatchModal(ModalScreen):
+class SummaryModal(ModalScreen):
     CONFIRM = ModalBinding("ctrl+j", "ctrl+enter", "dispatch")
     DISMISS = ModalBinding("escape", "esc", "cancel")
     CLOSE = ModalBinding("escape", "esc", "close")
     RETRY = ModalBinding("ctrl+j", "ctrl+enter", "retry")
 
     DEFAULT_CSS = """
-    DispatchModal {
+    SummaryModal {
         align: center middle;
     }
-    DispatchModal #dispatch-container {
+    SummaryModal #dispatch-container {
         width: 90%;
         max-width: 120;
         max-height: 60%;
         border: solid $accent;
         background: $surface;
     }
-    DispatchModal #dispatch-title {
+    SummaryModal #dispatch-title {
         background: $accent;
         color: $text;
         padding: 0 1;
         height: 1;
     }
-    DispatchModal #dispatch-columns {
+    SummaryModal #dispatch-columns {
         height: 1fr;
     }
-    DispatchModal #dispatch-left {
-        width: 1fr;
+    SummaryModal #dispatch-left {
+        width: 2fr;
         border-right: solid $accent;
         padding: 0 1;
     }
-    DispatchModal #dispatch-right {
-        width: 2fr;
+    SummaryModal #dispatch-right {
+        width: 1fr;
         padding: 0 1;
     }
-    DispatchModal #dispatch-summary {
+    SummaryModal #dispatch-summary {
         height: 1fr;
         border: none;
     }
-    DispatchModal #dispatch-summary:focus {
+    SummaryModal #dispatch-summary:focus {
         border: none;
     }
-    DispatchModal LoadingIndicator {
+    SummaryModal #dispatch-waiting {
         height: 1fr;
+        align: center middle;
+    }
+    SummaryModal #dispatch-waiting Static {
+        text-align: center;
+        color: $text-muted;
+        width: auto;
+    }
+    SummaryModal #dispatch-waiting LoadingIndicator {
+        height: 3;
         background: transparent;
     }
-    DispatchModal DataTable {
+    SummaryModal DataTable {
         height: auto;
     }
-    DispatchModal #dispatch-detail {
+    SummaryModal #dispatch-detail {
         height: auto;
-        color: $text-muted;
         padding: 1 0 0 0;
     }
-    DispatchModal #dispatch-hint {
+    SummaryModal #dispatch-comment-body {
+        height: auto;
+        color: $text-muted;
+        border: solid $accent;
+        padding: 0 1;
+        margin-bottom: 1;
+    }
+    SummaryModal #dispatch-reply-body {
+        height: auto;
+        color: $text;
+        border: solid $success;
+        padding: 0 1;
+    }
+    SummaryModal #dispatch-hint {
         color: $text-muted;
         padding: 0 1;
         height: 1;
         text-align: right;
     }
-    DispatchModal.status-done    DataTable .datatable--cursor { background: #00aa00 25%; }
-    DispatchModal.status-partial DataTable .datatable--cursor { background: #aa00aa 25%; }
-    DispatchModal.status-refused DataTable .datatable--cursor { background: #aa0000 25%; }
-    DispatchModal.status-blocked DataTable .datatable--cursor { background: #aaaa00 25%; }
+    SummaryModal.status-done    DataTable .datatable--cursor { background: #00aa00 25%; }
+    SummaryModal.status-partial DataTable .datatable--cursor { background: #aa00aa 25%; }
+    SummaryModal.status-refused DataTable .datatable--cursor { background: #aa0000 25%; }
+    SummaryModal.status-blocked DataTable .datatable--cursor { background: #aaaa00 25%; }
     """
 
     class DispatchRequested(Message):
@@ -524,7 +546,9 @@ class DispatchModal(ModalScreen):
                 with Vertical(id="dispatch-right"):
                     table = DataTable(id="dispatch-table", cursor_type="row", show_header=True)
                     yield table
-                    yield Static("", id="dispatch-detail")
+                    with Vertical(id="dispatch-detail"):
+                        yield Static("", id="dispatch-comment-body")
+                        yield Static("", id="dispatch-reply-body")
             yield Static(hint, id="dispatch-hint")
 
     def on_mount(self):
@@ -540,13 +564,10 @@ class DispatchModal(ModalScreen):
         if not self._request.comments:
             return
         comment = self._request.comments[row_index]
-        if self._state == "response" and self._response:
-            responded = next((c for c in self._response.comments if c.id == comment.id), None)
-            if responded and responded.reply:
-                self.query_one("#dispatch-detail", Static).update(
-                    f"{comment.body}\n\n{responded.reply}"
-                )
-                return
+        comment_body = self.query_one("#dispatch-comment-body", Static)
+        reply_body = self.query_one("#dispatch-reply-body", Static)
+        # Build the comment body text (may include diff context)
+        body_text = comment.body
         location = None
         for hunk_idx, hunk in enumerate(self._hunks):
             if hunk.file != comment.file:
@@ -561,37 +582,74 @@ class DispatchModal(ModalScreen):
                     target_line += 1
             if location:
                 break
-        text = comment.body
         if location:
             hunk_idx, first_line_idx, last_line_idx = location
             hunk = self._hunks[hunk_idx]
             diff_lines = hunk.lines[first_line_idx:last_line_idx + 1]
-            text += "\n\n" + "".join(l.rstrip("\n") + "\n" for l in diff_lines)
-        self.query_one("#dispatch-detail", Static).update(text)
+            body_text += "\n\n" + "".join(l.rstrip("\n") + "\n" for l in diff_lines)
+        comment_body.update(body_text)
+        # Show reply if available
+        reply_text = ""
+        if self._state == "response" and self._response:
+            responded = next((c for c in self._response.comments if c.id == comment.id), None)
+            if responded and responded.reply:
+                reply_text = responded.reply
+        reply_body.update(reply_text)
+        reply_body.display = bool(reply_text)
 
     def on_data_table_row_highlighted(self, event):
         self._update_detail(event.cursor_row)
 
     def set_waiting(self):
         self._state = "waiting"
-        left = self.query_one("#dispatch-left")
-        left.remove_children()
-        left.mount(LoadingIndicator())
+        # Remove whatever content is currently between title and hint
+        columns = self.query("#dispatch-columns")
+        if columns:
+            columns.first().remove()
+        error_msg = self.query("#dispatch-error-msg")
+        if error_msg:
+            error_msg.first().remove()
         self.query_one("#dispatch-hint", Static).update("")
-        self.query_one("#dispatch-title", Static).update("Dispatch review")
+        self.query_one("#dispatch-title", Static).update("Waiting for response")
+        container = self.query_one("#dispatch-container")
+        waiting = Vertical(id="dispatch-waiting")
+        container.mount(waiting, before=self.query_one("#dispatch-hint"))
+        waiting.mount(LoadingIndicator())
+        waiting.mount(Static("Waiting for response\u2026"))
+
+    def _rebuild_columns(self):
+        """Rebuild the two-column layout after the waiting state."""
+        container = self.query_one("#dispatch-container")
+        waiting = self.query("#dispatch-waiting")
+        if waiting:
+            waiting.first().remove()
+        columns = Horizontal(id="dispatch-columns")
+        container.mount(columns, before=self.query_one("#dispatch-hint"))
+        left = Vertical(id="dispatch-left")
+        right = Vertical(id="dispatch-right")
+        columns.mount(left)
+        columns.mount(right)
+        return left, right
 
     def set_response(self, response):
         import uuid
         self._state = "response"
         self._response = response
-        left = self.query_one("#dispatch-left")
-        left.query_one(LoadingIndicator).remove()
+        left, right = self._rebuild_columns()
         summary_text = response.summary or "(no summary)"
         ta = TextArea(summary_text, id="dispatch-summary")
         ta.read_only = True
         left.mount(ta)
-        self.query_one("#dispatch-title", Static).update("Agent response")
-        table = self.query_one(DataTable)
+        table = DataTable(id="dispatch-table", cursor_type="row", show_header=True)
+        right.mount(table)
+        detail = Vertical(id="dispatch-detail")
+        right.mount(detail)
+        detail.mount(Static("", id="dispatch-comment-body"))
+        detail.mount(Static("", id="dispatch-reply-body"))
+        self._col_file = table.add_column("File")
+        self._col_lines = table.add_column("Lines")
+        for comment in self._request.comments:
+            table.add_row(comment.file, f"{comment.first_line}–{comment.last_line}", key=str(comment.id))
         by_id = {c.id: c for c in response.comments}
         for row_key in table.rows:
             comment_id = uuid.UUID(row_key.value)
@@ -600,6 +658,7 @@ class DispatchModal(ModalScreen):
                 colour = STATUS_COLOURS.get(responded.status, "#808080")
                 table.update_cell(row_key, self._col_file, Text(responded.file, style=colour))
                 table.update_cell(row_key, self._col_lines, Text(f"{responded.first_line}–{responded.last_line}", style=colour))
+        self.query_one("#dispatch-title", Static).update("Agent response")
         hint = f"{self.CLOSE.label}  {self.CLOSE.description}"
         self.query_one("#dispatch-hint", Static).update(hint)
         self._update_detail(table.cursor_row)
@@ -607,9 +666,17 @@ class DispatchModal(ModalScreen):
     def set_error(self, message):
         self._state = "error"
         self._error_message = message
-        left = self.query_one("#dispatch-left")
-        left.remove_children()
-        left.mount(Static(message, id="dispatch-error-msg"))
+        # Remove waiting indicator if present
+        waiting = self.query("#dispatch-waiting")
+        if waiting:
+            waiting.first().remove()
+        # Remove columns if present (shouldn't be during waiting->error, but be safe)
+        columns = self.query("#dispatch-columns")
+        if columns:
+            columns.first().remove()
+        container = self.query_one("#dispatch-container")
+        error_widget = Static(message, id="dispatch-error-msg")
+        container.mount(error_widget, before=self.query_one("#dispatch-hint"))
         self.query_one("#dispatch-title", Static).update("Dispatch failed")
         hint = f"{self.RETRY.label}  {self.RETRY.description}    {self.DISMISS.label}  {self.DISMISS.description}"
         self.query_one("#dispatch-hint", Static).update(hint)
@@ -954,18 +1021,18 @@ class BurrowApp(App):
 
 
     def action_dispatch(self):
-        self.push_screen(DispatchModal(self.request, self.hunks))
+        self.push_screen(SummaryModal(self.request, self.hunks))
 
-    def on_dispatch_modal_dispatch_requested(self, event):
+    def on_summary_modal_dispatch_requested(self, event):
         self.request.summary = (event.summary or "").strip()
         self.request.save()
         self.run_worker(self._run_dispatch(), exclusive=True)
 
-    def on_dispatch_modal_retry_requested(self, event):
+    def on_summary_modal_retry_requested(self, event):
         self.run_worker(self._run_dispatch(), exclusive=True)
 
     async def _run_dispatch(self):
-        modal = next((s for s in self.screen_stack if isinstance(s, DispatchModal)), None)
+        modal = next((s for s in self.screen_stack if isinstance(s, SummaryModal)), None)
         if modal is None:
             return
         returncode = await run_agent(self.request)
@@ -980,7 +1047,7 @@ class BurrowApp(App):
         modal.set_response(response)
 
     def action_summary(self):
-        self.push_screen(SummaryModal(self.request.summary), self._on_summary_result)
+        self.push_screen(SummaryEditModal(self.request.summary), self._on_summary_result)
 
     def _on_summary_result(self, summary):
         if summary is not None:
