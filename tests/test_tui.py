@@ -785,6 +785,7 @@ async def test_dispatch_modal_shows_spinner_while_waiting(tmp_path):
 
 
 @pytest.mark.rule("dispatch-success")
+@pytest.mark.rule("dispatch-success-bell")
 async def test_dispatch_success_transitions_modal_to_response_state(tmp_path):
     (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
     request = Request(summary="", repo_root=tmp_path)
@@ -815,10 +816,13 @@ async def test_dispatch_success_transitions_modal_to_response_state(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=request)
         async with app.run_test() as pilot:
-            with patch("burrow.tui.run_agent", fake_run_agent):
-                await pilot.press(">")
-                await pilot.press(SummaryModal.CONFIRM.key)
-                await pilot.pause(delay=0.2)
+            with patch.object(app, "bell", wraps=app.bell) as mock_bell:
+                with patch("burrow.tui.run_agent", fake_run_agent):
+                    await pilot.press(">")
+                    await pilot.press(SummaryModal.CONFIRM.key)
+                    await pilot.pause(delay=0.2)
+                # bell is rung on successful dispatch
+                mock_bell.assert_called_once()
             modal = next(s for s in app.screen_stack if isinstance(s, SummaryModal))
             assert modal._state == "response"
             # left pane shows agent summary as read-only TextArea

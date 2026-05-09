@@ -375,6 +375,7 @@ flowchart TD
 | dispatch | `dispatch-spawner-hardcoded` | The agent spawner command SHALL be hardcoded as `claude -p --allowedTools Bash Read Edit Write` for this version. | configuration |
 | waiting | `dispatch-waiting` | SHALL replace the finalise modal with a waiting modal showing a spinner and "Waiting for agent response…" while the subprocess is running. The TUI SHALL NOT accept any input during this time. | usability |
 | exit | `dispatch-success` | SHALL dismiss the waiting modal and show a response summary modal displaying the agent's summary and a count of comments by status. Any key dismisses the response summary modal. | data, usability |
+| exit | `dispatch-success-bell` | SHALL ring the terminal bell when the agent response is successfully loaded after dispatch. | usability |
 | error | `dispatch-error` | SHALL show an error modal with the exit code and/or validation error message when the subprocess exits non-zero, or when `.burrow/response.json` is absent or invalid after exit. | error, usability |
 | retry | `dispatch-retry` | SHALL offer a "Try again" action in the error modal that immediately re-dispatches the same request without returning to the finalise modal. | usability |
 

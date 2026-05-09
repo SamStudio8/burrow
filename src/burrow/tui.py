@@ -1057,6 +1057,7 @@ class BurrowApp(App):
             modal.set_error("Agent exited successfully but response.json is missing or invalid.")
             return
         self.load_response(response)
+        self.bell()
         modal.set_response(response)
 
     def action_summary(self):
