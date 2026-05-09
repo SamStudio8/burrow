@@ -594,13 +594,6 @@ class BurrowApp(App):
                     target_line += 1
         return None
 
-    def _comment_is_valid(self, comment):
-        path = self.request.repo_root / comment.file
-        if not path.is_file():
-            return False
-        line_count = len(path.read_text().splitlines())
-        return comment.last_line <= line_count
-
     def _load_existing_comments(self, response=None):
         response_by_id = {c.id: c for c in response.comments} if response else {}
         for comment in self.request.comments:
@@ -626,7 +619,7 @@ class BurrowApp(App):
     def on_mount(self):
         self._update_highlight(0)
         self._update_line_highlight(0)
-        stale = any(not self._comment_is_valid(c) for c in self.request.comments)
+        stale = any(self._locate_comment(c) is None for c in self.request.comments)
         if stale:
             self.push_screen(StaleSessionModal(), self._on_stale_result)
             return

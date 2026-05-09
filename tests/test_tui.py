@@ -442,8 +442,9 @@ async def test_existing_comments_rendered_on_startup(tmp_path):
 
 
 @pytest.mark.rule("tui-stale-session")
-async def test_stale_session_modal_shown_when_comment_file_missing(tmp_path):
+async def test_stale_session_modal_shown_when_comment_not_in_diff(tmp_path):
     request = Request(summary="", repo_root=tmp_path)
+    # gone.py does not appear in SAMPLE_DIFF, so _locate_comment returns None
     request.comments.append(Comment(file="gone.py", first_line=1, last_line=1, body="orphaned"))
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=request)
@@ -457,6 +458,18 @@ async def test_stale_session_modal_shown_when_comment_file_missing(tmp_path):
             await pilot.pause()
             bar = str(app.screen.query_one("StatusBar").render())
             assert "0 comments" in bar
+
+
+@pytest.mark.rule("tui-stale-session")
+async def test_stale_session_modal_shown_when_anchor_line_not_in_diff(tmp_path):
+    # foo.py is in SAMPLE_DIFF but only lines 1-4; line 99 is not in any hunk
+    (tmp_path / "foo.py").write_text("".join(f"line{i}\n" for i in range(1, 200)))
+    request = Request(summary="", repo_root=tmp_path)
+    request.comments.append(Comment(file="foo.py", first_line=99, last_line=99, body="off-diff"))
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            assert any(isinstance(s, StaleSessionModal) for s in app.screen_stack)
 
 
 @pytest.mark.rule("summary-edit-tui")
