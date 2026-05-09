@@ -670,6 +670,29 @@ async def test_comment_nav_highlights_anchor_lines(tmp_path):
             assert "selected" not in app.screen.query_one("#hunk-0-line-2").classes
 
 
+@pytest.mark.rule("dispatch-confirm")
+async def test_escape_dismisses_dispatch_modal(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press(">")
+            assert any(isinstance(s, DispatchModal) for s in app.screen_stack)
+            await pilot.press("escape")
+            assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
+
+
+@pytest.mark.rule("dispatch-confirm")
+async def test_ctrl_enter_dismisses_dispatch_modal_and_triggers_dispatch(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            with patch.object(app, "_run_dispatch") as mock_dispatch:
+                await pilot.press(">")
+                await pilot.press("ctrl+j")
+                assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
+                mock_dispatch.assert_called_once()
+
+
 @pytest.mark.rule("dispatch-modal-summary")
 async def test_dispatch_modal_shows_summary_and_comments(tmp_path):
     (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")

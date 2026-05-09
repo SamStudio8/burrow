@@ -745,6 +745,10 @@ class BurrowApp(App):
         self.push_screen(DispatchModal(self.request), self._on_dispatch_result)
 
     def _on_dispatch_result(self, confirmed):
+        if confirmed:
+            self._run_dispatch()
+
+    def _run_dispatch(self):
         pass
 
     def action_summary(self):
