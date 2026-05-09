@@ -610,12 +610,11 @@ class SummaryModal(ModalScreen):
         if error_msg:
             error_msg.first().remove()
         self.query_one("#dispatch-hint", Static).update("")
-        self.query_one("#dispatch-title", Static).update("Waiting for response")
+        self.query_one("#dispatch-title", Static).update("Waiting for response...")
         container = self.query_one("#dispatch-container")
         waiting = Vertical(id="dispatch-waiting")
         container.mount(waiting, before=self.query_one("#dispatch-hint"))
         waiting.mount(LoadingIndicator())
-        waiting.mount(Static("Waiting for response\u2026"))
 
     def _rebuild_columns(self):
         """Rebuild the two-column layout after the waiting state."""
