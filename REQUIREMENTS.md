@@ -371,8 +371,8 @@ flowchart TD
 | input | `dispatch-invocation` | SHALL open a finalise modal when the user presses `>`. | interface, usability |
 | modal | `dispatch-modal-summary` | SHALL display the session summary and a list of all comments (file, line range, body) in the finalise modal. | usability |
 | confirm | `dispatch-confirm` | SHALL dispatch the request when the user presses `ctrl+enter` in the finalise modal, and dismiss on `escape`. | usability |
-| dispatch | `dispatch-spawn` | SHALL invoke the agent by spawning `claude --print` with the preamble and request JSON fed to stdin, in the repository root as working directory. | interface |
-| dispatch | `dispatch-spawner-hardcoded` | The agent spawner command SHALL be hardcoded as `claude --print` for this version. | configuration |
+| dispatch | `dispatch-spawn` | SHALL invoke the agent by spawning `claude -p --allowedTools Bash Read Edit Write` with the preamble and request JSON fed to stdin, in the repository root as working directory. | interface |
+| dispatch | `dispatch-spawner-hardcoded` | The agent spawner command SHALL be hardcoded as `claude -p --allowedTools Bash Read Edit Write` for this version. | configuration |
 | waiting | `dispatch-waiting` | SHALL replace the finalise modal with a waiting modal showing a spinner and "Waiting for agent response…" while the subprocess is running. The TUI SHALL NOT accept any input during this time. | usability |
 | exit | `dispatch-success` | SHALL dismiss the waiting modal and load `.burrow/response.json` when the subprocess exits zero and the response is valid. | data, usability |
 | error | `dispatch-error` | SHALL show an error modal with the exit code and/or validation error message when the subprocess exits non-zero, or when `.burrow/response.json` is absent or invalid after exit. | error, usability |

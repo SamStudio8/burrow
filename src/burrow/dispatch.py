@@ -12,7 +12,7 @@ def build_payload(request):
 async def run_agent(request):
     payload = build_payload(request).encode()
     proc = await asyncio.create_subprocess_exec(
-        "claude", "--print",
+        "claude", "-p", "--allowedTools", "Bash", "Read", "Edit", "Write",
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,

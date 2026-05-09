@@ -14,7 +14,7 @@ def test_build_payload_contains_preamble_and_request_id(tmp_path):
 
 
 @pytest.mark.rule("dispatch-spawn")
-async def test_run_agent_spawns_claude_print_with_payload_on_stdin(tmp_path):
+async def test_run_agent_spawns_claude_with_tools_and_payload_on_stdin(tmp_path):
     request = Request(summary="", repo_root=tmp_path)
     payload = build_payload(request)
 
@@ -27,7 +27,13 @@ async def test_run_agent_spawns_claude_print_with_payload_on_stdin(tmp_path):
 
     mock_spawn.assert_called_once()
     call = mock_spawn.call_args
-    assert call.args[:2] == ("claude", "--print")
+    assert call.args[:2] == ("claude", "-p")
+    assert "--allowedTools" in call.args
+    allowed = list(call.args[call.args.index("--allowedTools") + 1:])
+    assert "Bash" in allowed
+    assert "Read" in allowed
+    assert "Edit" in allowed
+    assert "Write" in allowed
     assert call.kwargs["cwd"] == request.repo_root
     stdin_data = call.kwargs["stdin"]
     import asyncio
