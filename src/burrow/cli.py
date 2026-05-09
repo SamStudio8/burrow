@@ -1,10 +1,9 @@
 import argparse
-import json
 import subprocess
 import sys
 from pathlib import Path
-from burrow.models import Request, Response, _serialise
-from burrow.preamble import PREAMBLE
+from burrow.dispatch import build_payload
+from burrow.models import Request, Response
 from burrow.tui import BurrowApp
 
 # did you know, you cant get these on windows
@@ -81,8 +80,7 @@ def cmd_end(args):
 
 def cmd_send(args):
     request = _current_request(ex_on_noinput=True)
-    request_json = json.dumps(request.to_dict(), default=_serialise, indent=2)
-    sys.stdout.write(PREAMBLE + "\n\n" + request_json + "\n")
+    sys.stdout.write(build_payload(request))
 
 
 class BurrowParser(argparse.ArgumentParser):
