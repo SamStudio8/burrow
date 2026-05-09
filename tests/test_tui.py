@@ -4,7 +4,7 @@ from unittest.mock import patch
 from textual.widgets import Static
 from burrow.models import Comment, Request
 from textual.widgets import TextArea
-from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal
+from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal, DispatchModal
 
 
 @pytest.mark.rule("diff-source")
@@ -668,6 +668,15 @@ async def test_comment_nav_highlights_anchor_lines(tmp_path):
             assert "selected" in app.screen.query_one("#hunk-0-line-0").classes
             assert "selected" in app.screen.query_one("#hunk-0-line-1").classes
             assert "selected" not in app.screen.query_one("#hunk-0-line-2").classes
+
+
+@pytest.mark.rule("dispatch-invocation")
+async def test_greater_than_opens_dispatch_modal(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            await pilot.press(">")
+            assert any(isinstance(s, DispatchModal) for s in app.screen_stack)
 
 
 @pytest.mark.rule("diff-nav-hunk-highlight")

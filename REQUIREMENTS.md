@@ -345,6 +345,41 @@ flowchart TD
 
 ---
 
+#### SCN-TUI-DISPATCH: User finalises and dispatches the review
+
+```mermaid
+flowchart TD
+    input([>]) --> modal[Show finalise modal]
+    modal --> review[Display summary and comment list]
+    review --> confirm{ctrl+enter / escape}
+    confirm -- escape --> dismiss([Dismiss modal])
+    confirm -- ctrl+enter --> dispatch[Spawn agent subprocess]
+    dispatch --> waiting[Show waiting modal - full block]
+    waiting --> exit{Subprocess exit}
+    exit -- non-zero --> error[Show error modal]
+    exit -- zero --> load[Load .burrow/response.json]
+    load --> valid{Valid?}
+    valid -- no --> error
+    valid -- yes --> dismiss2([Dismiss modal, TUI updated])
+    error --> retry{Try again / escape}
+    retry -- try again --> dispatch
+    retry -- escape --> dismiss3([Dismiss modal])
+```
+
+| Node | Slug | Statement | Tags |
+|---|---|---|---|
+| input | `dispatch-invocation` | SHALL open a finalise modal when the user presses `>`. | interface, usability |
+| modal | `dispatch-modal-summary` | SHALL display the session summary and a list of all comments (file, line range, body) in the finalise modal. | usability |
+| confirm | `dispatch-confirm` | SHALL dispatch the request when the user presses `ctrl+enter` in the finalise modal, and dismiss on `escape`. | usability |
+| dispatch | `dispatch-spawn` | SHALL invoke the agent by spawning `claude --print` with the preamble and request JSON fed to stdin, in the repository root as working directory. | interface |
+| dispatch | `dispatch-spawner-hardcoded` | The agent spawner command SHALL be hardcoded as `claude --print` for this version. | configuration |
+| waiting | `dispatch-waiting` | SHALL replace the finalise modal with a waiting modal showing a spinner and "Waiting for agent response…" while the subprocess is running. The TUI SHALL NOT accept any input during this time. | usability |
+| exit | `dispatch-success` | SHALL dismiss the waiting modal and load `.burrow/response.json` when the subprocess exits zero and the response is valid. | data, usability |
+| error | `dispatch-error` | SHALL show an error modal with the exit code and/or validation error message when the subprocess exits non-zero, or when `.burrow/response.json` is absent or invalid after exit. | error, usability |
+| retry | `dispatch-retry` | SHALL offer a "Try again" action in the error modal that immediately re-dispatches the same request without returning to the finalise modal. | usability |
+
+---
+
 ## Tag Glossary
 
 ### Standard tags
@@ -372,7 +407,7 @@ _None defined yet._
 
 | # | Question |
 |---|---|
-| D-1 | How does Burrow invoke the agent — subprocess, HTTP, stdin/stdout pipe? Burrow will eventually own the dispatch lifecycle; transport mechanism is not yet decided. |
+| ~~D-1~~ | ~~How does Burrow invoke the agent — subprocess, HTTP, stdin/stdout pipe?~~ Resolved: Burrow spawns `claude --print` as a subprocess, feeding the preamble and request JSON to stdin. A settings page to configure the spawner is deferred. |
 | ~~D-5~~ | ~~Which framework should the TUI be built with?~~ Resolved: Textual. |
 | ~~D-2~~ | ~~Does Burrow persist sessions across invocations, or is each run stateless?~~ Resolved: the Request and Response JSON files are the session state. |
 | ~~D-3~~ | ~~Is the diff always sourced from git, or can it be provided as a file?~~ Resolved: the agent is assumed to have repo access; the diff is not embedded in the Request. |

@@ -378,6 +378,57 @@ class BurrowHeader(Static):
         return "🐇 burrow"
 
 
+class DispatchModal(ModalScreen):
+    DEFAULT_CSS = """
+    DispatchModal {
+        align: center middle;
+    }
+    DispatchModal #dispatch-container {
+        width: 80;
+        height: auto;
+        border: solid $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    DispatchModal #dispatch-title {
+        background: $accent;
+        color: $text;
+        padding: 0 1;
+        height: 1;
+        margin-bottom: 1;
+    }
+    DispatchModal #dispatch-hint {
+        color: $text-muted;
+        padding: 0 1;
+        height: 1;
+        text-align: right;
+        margin-top: 1;
+    }
+    """
+
+    def __init__(self, request):
+        super().__init__()
+        self._request = request
+
+    def compose(self):
+        with Vertical(id="dispatch-container"):
+            yield Static("Dispatch review", id="dispatch-title")
+            summary = self._request.summary or "(no summary)"
+            yield Static(f"Summary: {summary}")
+            yield Static("")
+            for comment in self._request.comments:
+                yield Static(f"  {comment.file}:{comment.first_line}–{comment.last_line}  {comment.body}")
+            yield Static("ctrl+enter  dispatch    esc  cancel", id="dispatch-hint")
+
+    def _on_key(self, event):
+        if event.key == "ctrl+j":
+            event.stop()
+            self.dismiss(True)
+        elif event.key == "escape":
+            event.stop()
+            self.dismiss(False)
+
+
 class BurrowApp(App):
     TITLE = "burrow"
     BINDINGS = [
@@ -393,6 +444,7 @@ class BurrowApp(App):
         Binding("shift+n", "prev_comment", "Prev comment"),
         Binding("question_mark", "help", "Help"),
         Binding("at", "summary", "Summary"),
+        Binding("greater_than_sign", "dispatch", "Dispatch"),
     ]
 
     selected_hunk = reactive(0)
@@ -688,6 +740,12 @@ class BurrowApp(App):
         if self._comment_index >= 0:
             self._navigate_to_comment(self._comment_index)
 
+
+    def action_dispatch(self):
+        self.push_screen(DispatchModal(self.request), self._on_dispatch_result)
+
+    def _on_dispatch_result(self, confirmed):
+        pass
 
     def action_summary(self):
         self.push_screen(SummaryModal(self.request.summary), self._on_summary_result)
