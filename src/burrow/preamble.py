@@ -5,7 +5,9 @@ is to address those comments and produce a Response.
 
 The Request is provided as JSON. It contains:
 - id: the unique identifier for this request
-- summary: optional context from the Reviewer
+- summary: high-level context, instructions, or questions from the Reviewer. Read \
+this carefully — it may contain guidance that applies across all comments, or \
+questions that you should answer in your Response summary.
 - comments: a list of Comments, each with:
   - id: stable identifier you must reference in your Response
   - file, first_line, last_line: the anchor — where in the codebase the comment applies
