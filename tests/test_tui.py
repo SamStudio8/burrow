@@ -4,7 +4,7 @@ from unittest.mock import patch
 from textual.widgets import Static
 from burrow.models import Comment, Request
 from textual.widgets import TextArea
-from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal, DispatchModal, WaitingModal, ErrorModal, ResponseSummaryModal
+from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal, DispatchModal, ErrorModal
 
 
 @pytest.mark.rule("diff-source")
@@ -762,30 +762,30 @@ async def test_dispatch_modal_summary_is_editable_and_saved(tmp_path):
 
 
 @pytest.mark.rule("dispatch-waiting")
-async def test_waiting_modal_shown_with_spinner_during_dispatch(tmp_path):
-    import inspect
-    from burrow.tui import WaitingModal as WM
+async def test_dispatch_modal_shows_spinner_while_waiting(tmp_path):
+    from textual.widgets import LoadingIndicator
 
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
-            waiting_shown = []
+            spinner_seen = []
             async def fake_run_agent(request):
-                waiting_shown.append(any(isinstance(s, WaitingModal) for s in app.screen_stack))
+                modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+                spinner_seen.append(len(modal.query(LoadingIndicator)) > 0)
                 return 0
             with patch("burrow.tui.run_agent", fake_run_agent):
                 await pilot.press(">")
                 await pilot.press(DispatchModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            # WaitingModal was visible while agent ran, and dismissed after
-            assert waiting_shown == [True]
-            assert not any(isinstance(s, WaitingModal) for s in app.screen_stack)
-            # WaitingModal composes a LoadingIndicator
-            assert "LoadingIndicator" in inspect.getsource(WM.compose)
+            # spinner was visible during agent run; gone after agent finishes
+            assert spinner_seen == [True]
+            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            assert len(modal.query(LoadingIndicator)) == 0
+            assert modal._state != "waiting"
 
 
 @pytest.mark.rule("dispatch-success")
-async def test_dispatch_success_shows_summary_loads_response_and_dismisses(tmp_path):
+async def test_dispatch_success_transitions_modal_to_response_state(tmp_path):
     (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
     request = Request(summary="", repo_root=tmp_path)
     request.save()
@@ -819,24 +819,26 @@ async def test_dispatch_success_shows_summary_loads_response_and_dismisses(tmp_p
                 await pilot.press(">")
                 await pilot.press(DispatchModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            # WaitingModal dismissed, ResponseSummaryModal shown
-            assert not any(isinstance(s, WaitingModal) for s in app.screen_stack)
-            assert any(isinstance(s, ResponseSummaryModal) for s in app.screen_stack)
-            modal = next(s for s in app.screen_stack if isinstance(s, ResponseSummaryModal))
-            text = " ".join(str(w.render()) for w in modal.query(Static))
-            assert "all done" in text
-            assert "done" in text
-            assert "1" in text
-            # dismiss and check response loaded into CommentBlock
-            await pilot.press("space")
-            assert not any(isinstance(s, ResponseSummaryModal) for s in app.screen_stack)
+            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            assert modal._state == "response"
+            # left pane shows agent summary as read-only TextArea
+            ta = modal.query_one("#dispatch-summary", TextArea)
+            assert ta.read_only
+            assert "all done" in ta.text
+            # table row coloured by status
+            from textual.widgets import DataTable
+            table = modal.query_one(DataTable)
+            assert table.row_count == 1
+            # close modal and check CommentBlock updated
+            await pilot.press(DispatchModal.CLOSE.key)
+            assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
             block = app.screen.query_one("CommentBlock")
             assert "status-done" in block.classes
             assert "fixed it" in str(block.render())
 
 
 @pytest.mark.rule("dispatch-retry")
-async def test_retry_redispatches_without_returning_to_finalise(tmp_path):
+async def test_retry_keeps_modal_open_and_redispatches(tmp_path):
     call_count = [0]
 
     async def fake_run_agent(request):
@@ -850,16 +852,19 @@ async def test_retry_redispatches_without_returning_to_finalise(tmp_path):
                 await pilot.press(">")
                 await pilot.press(DispatchModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-                assert any(isinstance(s, ErrorModal) for s in app.screen_stack)
-                assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
-                await pilot.press(ErrorModal.CONFIRM.key)
+                modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+                assert modal._state == "error"
+                await pilot.press(DispatchModal.RETRY.key)
                 await pilot.pause(delay=0.2)
+            # modal still open (in error state again), called agent twice
             assert call_count[0] == 2
-            assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
+            assert any(isinstance(s, DispatchModal) for s in app.screen_stack)
+            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            assert modal._state == "error"
 
 
 @pytest.mark.rule("dispatch-error")
-async def test_dispatch_error_shown_on_nonzero_exit(tmp_path):
+async def test_dispatch_error_transitions_modal_on_nonzero_exit(tmp_path):
     async def fake_run_agent(request):
         return 1
 
@@ -870,16 +875,15 @@ async def test_dispatch_error_shown_on_nonzero_exit(tmp_path):
                 await pilot.press(">")
                 await pilot.press(DispatchModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            assert not any(isinstance(s, WaitingModal) for s in app.screen_stack)
-            assert any(isinstance(s, ErrorModal) for s in app.screen_stack)
-            modal = next(s for s in app.screen_stack if isinstance(s, ErrorModal))
-            text = " ".join(str(w.render()) for w in modal.query(Static))
-            assert "1" in text  # exit code present
+            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            assert modal._state == "error"
+            hint = str(modal.query_one("#dispatch-hint", Static).render())
+            assert "1" in str(modal.query_one("#dispatch-error-msg", Static).render())
+            assert DispatchModal.RETRY.label in hint
 
 
 @pytest.mark.rule("dispatch-error")
 async def test_dispatch_error_shown_when_response_missing_or_invalid(tmp_path):
-    # exit-zero but no response.json → error
     async def fake_run_no_response(request):
         return 0
 
@@ -890,9 +894,9 @@ async def test_dispatch_error_shown_when_response_missing_or_invalid(tmp_path):
                 await pilot.press(">")
                 await pilot.press(DispatchModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            assert any(isinstance(s, ErrorModal) for s in app.screen_stack)
+            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            assert modal._state == "error"
 
-    # exit-zero but invalid response.json → error
     request = Request(summary="", repo_root=tmp_path)
     request.save()
 
@@ -907,13 +911,14 @@ async def test_dispatch_error_shown_when_response_missing_or_invalid(tmp_path):
                 await pilot.press(">")
                 await pilot.press(DispatchModal.CONFIRM.key)
                 await pilot.pause(delay=0.2)
-            assert any(isinstance(s, ErrorModal) for s in app.screen_stack)
+            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            assert modal._state == "error"
 
 
 @pytest.mark.rule("dispatch-confirm")
 async def test_dispatch_modal_confirm_and_dismiss(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        # escape dismisses
+        # escape dismisses in compose state
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
             await pilot.press(">")
@@ -922,14 +927,24 @@ async def test_dispatch_modal_confirm_and_dismiss(tmp_path):
             assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
 
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        # ctrl+enter dismisses and triggers dispatch
+        # ctrl+enter transitions away from compose and keeps modal on screen
+        async def fake_run_agent(request):
+            return 1  # fail so we don't need a real response.json
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
-            with patch.object(app, "_run_dispatch") as mock_dispatch:
+            with patch("burrow.tui.run_agent", fake_run_agent):
                 await pilot.press(">")
+                modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+                assert modal._state == "compose"
                 await pilot.press(DispatchModal.CONFIRM.key)
-                assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
-                mock_dispatch.assert_called_once()
+                await pilot.pause(delay=0.2)
+            # modal still on screen (in error state), was not dismissed
+            assert any(isinstance(s, DispatchModal) for s in app.screen_stack)
+            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            assert modal._state != "compose"
+            # cancel via DISMISS binding closes the modal
+            await pilot.press(DispatchModal.DISMISS.key)
+            assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
 
 
 @pytest.mark.rule("dispatch-invocation")

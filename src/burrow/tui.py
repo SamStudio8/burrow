@@ -7,6 +7,7 @@ from burrow.dispatch import run_agent
 from burrow.models import Request, Response
 from textual.app import App
 from textual.binding import Binding
+from textual.message import Message
 from textual.screen import ModalScreen
 from textual.keys import key_to_character
 from textual.reactive import reactive
@@ -430,83 +431,11 @@ class ErrorModal(ModalScreen):
         self.dismiss(event.key == self.CONFIRM.key)
 
 
-class WaitingModal(ModalScreen):
-    DEFAULT_CSS = """
-    WaitingModal {
-        align: center middle;
-    }
-    WaitingModal > Static {
-        background: $surface;
-        border: solid $accent;
-        padding: 1 2;
-        height: auto;
-        width: auto;
-    }
-    """
-
-    def compose(self):
-        yield Static("Waiting for agent response…")
-        yield LoadingIndicator()
-
-    def _on_key(self, event):
-        event.stop()
-
-
-class ResponseSummaryModal(ModalScreen):
-    DISMISS = ModalBinding("any", "any key", "dismiss")
-
-    DEFAULT_CSS = """
-    ResponseSummaryModal {
-        align: center middle;
-    }
-    ResponseSummaryModal #response-container {
-        width: 60;
-        height: auto;
-        border: solid $accent;
-        background: $surface;
-        padding: 1 2;
-    }
-    ResponseSummaryModal #response-title {
-        background: $accent;
-        color: $text;
-        padding: 0 1;
-        height: 1;
-        margin-bottom: 1;
-    }
-    ResponseSummaryModal #response-hint {
-        color: $text-muted;
-        padding: 0 1;
-        height: 1;
-        text-align: right;
-        margin-top: 1;
-    }
-    """
-
-    def __init__(self, response):
-        super().__init__()
-        self._response = response
-
-    def compose(self):
-        from collections import Counter
-        counts = Counter(c.status for c in self._response.comments)
-        with Vertical(id="response-container"):
-            yield Static("Agent response", id="response-title")
-            yield Static(self._response.summary or "(no summary)")
-            yield Static("")
-            for status in ("done", "partial", "refused", "blocked"):
-                n = counts.get(status, 0)
-                if n:
-                    yield Static(f"  {status}: {n}")
-            yield Static(f"{self.DISMISS.label} to {self.DISMISS.description}", id="response-hint")
-
-    def _on_key(self, event):
-        event.stop()
-        self.dismiss()
-
-
 class DispatchModal(ModalScreen):
     CONFIRM = ModalBinding("ctrl+j", "ctrl+enter", "dispatch")
     DISMISS = ModalBinding("escape", "esc", "cancel")
+    CLOSE = ModalBinding("escape", "esc", "close")
+    RETRY = ModalBinding("ctrl+j", "ctrl+enter", "retry")
 
     DEFAULT_CSS = """
     DispatchModal {
@@ -544,6 +473,10 @@ class DispatchModal(ModalScreen):
     DispatchModal #dispatch-summary:focus {
         border: none;
     }
+    DispatchModal LoadingIndicator {
+        height: 1fr;
+        background: transparent;
+    }
     DispatchModal DataTable {
         height: auto;
     }
@@ -558,28 +491,45 @@ class DispatchModal(ModalScreen):
         height: 1;
         text-align: right;
     }
+    DispatchModal.status-done    DataTable .datatable--cursor { background: #00aa00 25%; }
+    DispatchModal.status-partial DataTable .datatable--cursor { background: #aa00aa 25%; }
+    DispatchModal.status-refused DataTable .datatable--cursor { background: #aa0000 25%; }
+    DispatchModal.status-blocked DataTable .datatable--cursor { background: #aaaa00 25%; }
     """
+
+    class DispatchRequested(Message):
+        def __init__(self, summary):
+            super().__init__()
+            self.summary = summary
+
+    class RetryRequested(Message):
+        pass
 
     def __init__(self, request, hunks):
         super().__init__()
         self._request = request
         self._hunks = hunks
+        self._state = "compose"
+        self._response = None
+        self._error_message = None
 
     def compose(self):
         hint = f"{self.CONFIRM.label}  {self.CONFIRM.description}    {self.DISMISS.label}  {self.DISMISS.description}"
-        yield Static("Dispatch review", id="dispatch-title")
-        with Horizontal(id="dispatch-columns"):
-            with Vertical(id="dispatch-left"):
-                yield TextArea(self._request.summary, id="dispatch-summary")
-            with Vertical(id="dispatch-right"):
-                table = DataTable(id="dispatch-table", cursor_type="row", show_header=True)
-                yield table
-                yield Static("", id="dispatch-detail")
-        yield Static(hint, id="dispatch-hint")
+        with Vertical(id="dispatch-container"):
+            yield Static("Dispatch review", id="dispatch-title")
+            with Horizontal(id="dispatch-columns"):
+                with Vertical(id="dispatch-left"):
+                    yield TextArea(self._request.summary, id="dispatch-summary")
+                with Vertical(id="dispatch-right"):
+                    table = DataTable(id="dispatch-table", cursor_type="row", show_header=True)
+                    yield table
+                    yield Static("", id="dispatch-detail")
+            yield Static(hint, id="dispatch-hint")
 
     def on_mount(self):
         table = self.query_one(DataTable)
-        table.add_columns("File", "Lines")
+        self._col_file = table.add_column("File")
+        self._col_lines = table.add_column("Lines")
         for comment in self._request.comments:
             table.add_row(comment.file, f"{comment.first_line}–{comment.last_line}", key=str(comment.id))
         self._update_detail(0)
@@ -589,6 +539,13 @@ class DispatchModal(ModalScreen):
         if not self._request.comments:
             return
         comment = self._request.comments[row_index]
+        if self._state == "response" and self._response:
+            responded = next((c for c in self._response.comments if c.id == comment.id), None)
+            if responded and responded.reply:
+                self.query_one("#dispatch-detail", Static).update(
+                    f"{comment.body}\n\n{responded.reply}"
+                )
+                return
         location = None
         for hunk_idx, hunk in enumerate(self._hunks):
             if hunk.file != comment.file:
@@ -614,6 +571,48 @@ class DispatchModal(ModalScreen):
     def on_data_table_row_highlighted(self, event):
         self._update_detail(event.cursor_row)
 
+    def set_waiting(self):
+        self._state = "waiting"
+        left = self.query_one("#dispatch-left")
+        left.remove_children()
+        left.mount(LoadingIndicator())
+        self.query_one("#dispatch-hint", Static).update("")
+        self.query_one("#dispatch-title", Static).update("Dispatch review")
+
+    def set_response(self, response):
+        import uuid
+        self._state = "response"
+        self._response = response
+        left = self.query_one("#dispatch-left")
+        left.query_one(LoadingIndicator).remove()
+        summary_text = response.summary or "(no summary)"
+        ta = TextArea(summary_text, id="dispatch-summary")
+        ta.read_only = True
+        left.mount(ta)
+        self.query_one("#dispatch-title", Static).update("Agent response")
+        table = self.query_one(DataTable)
+        by_id = {c.id: c for c in response.comments}
+        for row_key in table.rows:
+            comment_id = uuid.UUID(row_key.value)
+            responded = by_id.get(comment_id)
+            if responded:
+                colour = STATUS_COLOURS.get(responded.status, "#808080")
+                table.update_cell(row_key, self._col_file, Text(responded.file, style=colour))
+                table.update_cell(row_key, self._col_lines, Text(f"{responded.first_line}–{responded.last_line}", style=colour))
+        hint = f"{self.CLOSE.label}  {self.CLOSE.description}"
+        self.query_one("#dispatch-hint", Static).update(hint)
+        self._update_detail(table.cursor_row)
+
+    def set_error(self, message):
+        self._state = "error"
+        self._error_message = message
+        left = self.query_one("#dispatch-left")
+        left.remove_children()
+        left.mount(Static(message, id="dispatch-error-msg"))
+        self.query_one("#dispatch-title", Static).update("Dispatch failed")
+        hint = f"{self.RETRY.label}  {self.RETRY.description}    {self.DISMISS.label}  {self.DISMISS.description}"
+        self.query_one("#dispatch-hint", Static).update(hint)
+
     def _on_key(self, event):
         focused = self.focused
         if isinstance(focused, DataTable):
@@ -625,12 +624,27 @@ class DispatchModal(ModalScreen):
                 event.stop()
                 focused.action_cursor_up()
                 return
-        if event.key == self.CONFIRM.key:
-            event.stop()
-            self.dismiss(self.query_one("#dispatch-summary", TextArea).text)
-        elif event.key == self.DISMISS.key:
-            event.stop()
-            self.dismiss(None)
+        if self._state == "compose":
+            if event.key == self.CONFIRM.key:
+                event.stop()
+                summary = self.query_one("#dispatch-summary", TextArea).text
+                self.set_waiting()
+                self.post_message(self.DispatchRequested(summary))
+            elif event.key == self.DISMISS.key:
+                event.stop()
+                self.dismiss(None)
+        elif self._state == "response":
+            if event.key == self.CLOSE.key:
+                event.stop()
+                self.dismiss(None)
+        elif self._state == "error":
+            if event.key == self.RETRY.key:
+                event.stop()
+                self.set_waiting()
+                self.post_message(self.RetryRequested())
+            elif event.key == self.DISMISS.key:
+                event.stop()
+                self.dismiss(None)
 
 
 class BurrowApp(App):
@@ -939,31 +953,30 @@ class BurrowApp(App):
 
 
     def action_dispatch(self):
-        self.push_screen(DispatchModal(self.request, self.hunks), self._on_dispatch_result)
+        self.push_screen(DispatchModal(self.request, self.hunks))
 
-    def _on_dispatch_result(self, summary):
-        if summary is not None:
-            self.request.summary = summary.strip()
-            self.request.save()
-            self.run_worker(self._run_dispatch(), exclusive=True)
+    def on_dispatch_modal_dispatch_requested(self, event):
+        self.request.summary = (event.summary or "").strip()
+        self.request.save()
+        self.run_worker(self._run_dispatch(), exclusive=True)
+
+    def on_dispatch_modal_retry_requested(self, event):
+        self.run_worker(self._run_dispatch(), exclusive=True)
 
     async def _run_dispatch(self):
-        self.push_screen(WaitingModal())
+        modal = next((s for s in self.screen_stack if isinstance(s, DispatchModal)), None)
+        if modal is None:
+            return
         returncode = await run_agent(self.request)
-        self.pop_screen()
         if returncode != 0:
-            self.push_screen(ErrorModal(f"Agent exited with code {returncode}."), self._on_error_result)
+            modal.set_error(f"Agent exited with code {returncode}.")
             return
         response = self._try_load_response()
         if response is None:
-            self.push_screen(ErrorModal("Agent exited successfully but response.json is missing or invalid."), self._on_error_result)
+            modal.set_error("Agent exited successfully but response.json is missing or invalid.")
             return
         self.load_response(response)
-        self.push_screen(ResponseSummaryModal(response))
-
-    def _on_error_result(self, retry):
-        if retry:
-            self.run_worker(self._run_dispatch(), exclusive=True)
+        modal.set_response(response)
 
     def action_summary(self):
         self.push_screen(SummaryModal(self.request.summary), self._on_summary_result)

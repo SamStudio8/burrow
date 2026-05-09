@@ -125,7 +125,7 @@ class Request(Document):
         data = json.loads((repo_root / ".burrow" / "request.json").read_text())
         return cls(
             summary=data["summary"],
-            repo_root=Path(data["repo_root"]),
+            repo_root=repo_root,
             comments=cls._comments_from_data(data),
             id=UUID(data["id"]),
             created_at=datetime.fromisoformat(data["created_at"]),
