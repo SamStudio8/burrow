@@ -2,6 +2,7 @@ import subprocess
 from dataclasses import dataclass
 
 from rich.text import Text
+from burrow.dispatch import run_agent
 from burrow.models import Request, Response
 from textual.app import App
 from textual.binding import Binding
@@ -378,6 +379,27 @@ class BurrowHeader(Static):
         return "🐇 burrow"
 
 
+class WaitingModal(ModalScreen):
+    DEFAULT_CSS = """
+    WaitingModal {
+        align: center middle;
+    }
+    WaitingModal > Static {
+        background: $surface;
+        border: solid $accent;
+        padding: 1 2;
+        height: auto;
+        width: auto;
+    }
+    """
+
+    def compose(self):
+        yield Static("Waiting for agent response…")
+
+    def _on_key(self, event):
+        event.stop()
+
+
 class DispatchModal(ModalScreen):
     DEFAULT_CSS = """
     DispatchModal {
@@ -746,10 +768,12 @@ class BurrowApp(App):
 
     def _on_dispatch_result(self, confirmed):
         if confirmed:
-            self._run_dispatch()
+            self.run_worker(self._run_dispatch(), exclusive=True)
 
-    def _run_dispatch(self):
-        pass
+    async def _run_dispatch(self):
+        self.push_screen(WaitingModal())
+        returncode = await run_agent(self.request)
+        self.pop_screen()  # dismiss WaitingModal
 
     def action_summary(self):
         self.push_screen(SummaryModal(self.request.summary), self._on_summary_result)

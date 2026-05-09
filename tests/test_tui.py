@@ -4,7 +4,7 @@ from unittest.mock import patch
 from textual.widgets import Static
 from burrow.models import Comment, Request
 from textual.widgets import TextArea
-from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal, DispatchModal
+from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal, DispatchModal, WaitingModal
 
 
 @pytest.mark.rule("diff-source")
@@ -668,6 +668,23 @@ async def test_comment_nav_highlights_anchor_lines(tmp_path):
             assert "selected" in app.screen.query_one("#hunk-0-line-0").classes
             assert "selected" in app.screen.query_one("#hunk-0-line-1").classes
             assert "selected" not in app.screen.query_one("#hunk-0-line-2").classes
+
+
+@pytest.mark.rule("dispatch-waiting")
+async def test_waiting_modal_shown_during_dispatch(tmp_path):
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            waiting_shown = []
+            async def fake_run_agent(request):
+                waiting_shown.append(any(isinstance(s, WaitingModal) for s in app.screen_stack))
+                return 0
+            with patch("burrow.tui.run_agent", fake_run_agent):
+                await pilot.press(">")
+                await pilot.press("ctrl+j")
+                await pilot.pause(delay=0.2)
+            assert waiting_shown == [True]
+            assert not any(isinstance(s, WaitingModal) for s in app.screen_stack)
 
 
 @pytest.mark.rule("dispatch-confirm")
