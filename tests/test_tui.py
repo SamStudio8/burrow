@@ -670,6 +670,22 @@ async def test_comment_nav_highlights_anchor_lines(tmp_path):
             assert "selected" not in app.screen.query_one("#hunk-0-line-2").classes
 
 
+@pytest.mark.rule("dispatch-modal-summary")
+async def test_dispatch_modal_shows_summary_and_comments(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="my review", repo_root=tmp_path)
+    request.add_comment(file="foo.py", first_line=2, last_line=2, body="fix this")
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            await pilot.press(">")
+            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+            text = " ".join(str(w.render()) for w in modal.query(Static))
+            assert "my review" in text
+            assert "fix this" in text
+            assert "foo.py" in text
+
+
 @pytest.mark.rule("dispatch-invocation")
 async def test_greater_than_opens_dispatch_modal(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
