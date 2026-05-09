@@ -4,7 +4,7 @@ from unittest.mock import patch
 from textual.widgets import Static
 from burrow.models import Comment, Request
 from textual.widgets import TextArea
-from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal, DispatchModal, WaitingModal, ErrorModal
+from burrow.tui import get_diff, parse_diff, BurrowApp, colour_line, StaleSessionModal, SummaryModal, DispatchModal, WaitingModal, ErrorModal, ResponseSummaryModal
 
 
 @pytest.mark.rule("diff-source")
@@ -688,6 +688,109 @@ async def test_comment_nav_highlights_anchor_lines(tmp_path):
             assert "selected" not in app.screen.query_one("#hunk-0-line-2").classes
 
 
+@pytest.mark.rule("dispatch-modal-summary")
+async def test_dispatch_modal_shows_summary_and_comments_and_is_editable(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="before", repo_root=tmp_path)
+    request.add_comment(file="foo.py", first_line=2, last_line=2, body="fix this")
+
+    async def fake_run_agent(request):
+        return 1
+
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        with patch("burrow.tui.run_agent", fake_run_agent):
+            app = BurrowApp(request=request)
+            async with app.run_test() as pilot:
+                await pilot.press(">")
+                modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
+                # summary and comments are displayed
+                static_text = " ".join(str(w.render()) for w in modal.query(Static))
+                ta = modal.query_one(TextArea)
+                assert ta.text == "before"
+                assert "fix this" in static_text
+                assert "foo.py" in static_text
+                # summary is editable and persists after dispatch
+                ta.clear()
+                await pilot.press("a", "f", "t", "e", "r")
+                await pilot.press("ctrl+j")
+                await pilot.pause(delay=0.2)
+                assert app.request.summary == "after"
+
+
+@pytest.mark.rule("dispatch-waiting")
+async def test_waiting_modal_shown_with_spinner_during_dispatch(tmp_path):
+    import inspect
+    from burrow.tui import WaitingModal as WM
+
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
+        async with app.run_test() as pilot:
+            waiting_shown = []
+            async def fake_run_agent(request):
+                waiting_shown.append(any(isinstance(s, WaitingModal) for s in app.screen_stack))
+                return 0
+            with patch("burrow.tui.run_agent", fake_run_agent):
+                await pilot.press(">")
+                await pilot.press("ctrl+j")
+                await pilot.pause(delay=0.2)
+            # WaitingModal was visible while agent ran, and dismissed after
+            assert waiting_shown == [True]
+            assert not any(isinstance(s, WaitingModal) for s in app.screen_stack)
+            # WaitingModal composes a LoadingIndicator
+            assert "LoadingIndicator" in inspect.getsource(WM.compose)
+
+
+@pytest.mark.rule("dispatch-success")
+async def test_dispatch_success_shows_summary_loads_response_and_dismisses(tmp_path):
+    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
+    request = Request(summary="", repo_root=tmp_path)
+    request.save()
+    comment = request.add_comment(file="foo.py", first_line=2, last_line=2, body="fix this")
+    request.save()
+    response_data = {
+        "id": "a1b2c3d4-0000-0000-0000-000000000001",
+        "request_id": str(request.id),
+        "created_at": "2026-04-29T21:00:00+00:00",
+        "summary": "all done",
+        "agent_metadata": {"name": "test", "version": "0"},
+        "comments": [{
+            "id": str(comment.id),
+            "file": comment.file,
+            "first_line": comment.first_line,
+            "last_line": comment.last_line,
+            "body": comment.body,
+            "status": "done",
+            "reply": "fixed it",
+        }],
+    }
+
+    async def fake_run_agent(request):
+        (tmp_path / ".burrow" / "response.json").write_text(json.dumps(response_data))
+        return 0
+
+    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        app = BurrowApp(request=request)
+        async with app.run_test() as pilot:
+            with patch("burrow.tui.run_agent", fake_run_agent):
+                await pilot.press(">")
+                await pilot.press("ctrl+j")
+                await pilot.pause(delay=0.2)
+            # WaitingModal dismissed, ResponseSummaryModal shown
+            assert not any(isinstance(s, WaitingModal) for s in app.screen_stack)
+            assert any(isinstance(s, ResponseSummaryModal) for s in app.screen_stack)
+            modal = next(s for s in app.screen_stack if isinstance(s, ResponseSummaryModal))
+            text = " ".join(str(w.render()) for w in modal.query(Static))
+            assert "all done" in text
+            assert "done" in text
+            assert "1" in text
+            # dismiss and check response loaded into CommentBlock
+            await pilot.press("space")
+            assert not any(isinstance(s, ResponseSummaryModal) for s in app.screen_stack)
+            block = app.screen.query_one("CommentBlock")
+            assert "status-done" in block.classes
+            assert "fixed it" in str(block.render())
+
+
 @pytest.mark.rule("dispatch-retry")
 async def test_retry_redispatches_without_returning_to_finalise(tmp_path):
     call_count = [0]
@@ -731,100 +834,42 @@ async def test_dispatch_error_shown_on_nonzero_exit(tmp_path):
 
 
 @pytest.mark.rule("dispatch-error")
-async def test_dispatch_error_shown_when_response_missing(tmp_path):
-    async def fake_run_agent(request):
-        return 0  # success but writes no response.json
+async def test_dispatch_error_shown_when_response_missing_or_invalid(tmp_path):
+    # exit-zero but no response.json → error
+    async def fake_run_no_response(request):
+        return 0
 
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
-            with patch("burrow.tui.run_agent", fake_run_agent):
+            with patch("burrow.tui.run_agent", fake_run_no_response):
                 await pilot.press(">")
                 await pilot.press("ctrl+j")
                 await pilot.pause(delay=0.2)
             assert any(isinstance(s, ErrorModal) for s in app.screen_stack)
 
-
-@pytest.mark.rule("dispatch-error")
-async def test_dispatch_error_shown_when_response_invalid(tmp_path):
+    # exit-zero but invalid response.json → error
     request = Request(summary="", repo_root=tmp_path)
-    request.save()  # creates .burrow/
+    request.save()
 
-    async def fake_run_agent(req):
+    async def fake_run_bad_response(req):
         (tmp_path / ".burrow" / "response.json").write_text('{"request_id": "00000000-0000-0000-0000-000000000000"}')
         return 0
 
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
         app = BurrowApp(request=request)
         async with app.run_test() as pilot:
-            with patch("burrow.tui.run_agent", fake_run_agent):
+            with patch("burrow.tui.run_agent", fake_run_bad_response):
                 await pilot.press(">")
                 await pilot.press("ctrl+j")
                 await pilot.pause(delay=0.2)
             assert any(isinstance(s, ErrorModal) for s in app.screen_stack)
 
 
-@pytest.mark.rule("dispatch-success")
-async def test_dispatch_success_loads_response_and_dismisses_waiting(tmp_path):
-    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
-    request = Request(summary="", repo_root=tmp_path)
-    request.save()
-    comment = request.add_comment(file="foo.py", first_line=2, last_line=2, body="fix this")
-    request.save()
-    response_data = {
-        "id": "a1b2c3d4-0000-0000-0000-000000000001",
-        "request_id": str(request.id),
-        "created_at": "2026-04-29T21:00:00+00:00",
-        "summary": "done",
-        "agent_metadata": {"name": "test", "version": "0"},
-        "comments": [{
-            "id": str(comment.id),
-            "file": comment.file,
-            "first_line": comment.first_line,
-            "last_line": comment.last_line,
-            "body": comment.body,
-            "status": "done",
-            "reply": "fixed it",
-        }],
-    }
-
-    async def fake_run_agent(request):
-        (tmp_path / ".burrow" / "response.json").write_text(json.dumps(response_data))
-        return 0
-
-    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        app = BurrowApp(request=request)
-        async with app.run_test() as pilot:
-            with patch("burrow.tui.run_agent", fake_run_agent):
-                await pilot.press(">")
-                await pilot.press("ctrl+j")
-                await pilot.pause(delay=0.2)
-            assert not any(isinstance(s, WaitingModal) for s in app.screen_stack)
-            block = app.screen.query_one("CommentBlock")
-            assert "status-done" in block.classes
-            assert "fixed it" in str(block.render())
-
-
-@pytest.mark.rule("dispatch-waiting")
-async def test_waiting_modal_shown_during_dispatch(tmp_path):
-    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
-        async with app.run_test() as pilot:
-            waiting_shown = []
-            async def fake_run_agent(request):
-                waiting_shown.append(any(isinstance(s, WaitingModal) for s in app.screen_stack))
-                return 0
-            with patch("burrow.tui.run_agent", fake_run_agent):
-                await pilot.press(">")
-                await pilot.press("ctrl+j")
-                await pilot.pause(delay=0.2)
-            assert waiting_shown == [True]
-            assert not any(isinstance(s, WaitingModal) for s in app.screen_stack)
-
-
 @pytest.mark.rule("dispatch-confirm")
-async def test_escape_dismisses_dispatch_modal(tmp_path):
+async def test_dispatch_modal_confirm_and_dismiss(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        # escape dismisses
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
             await pilot.press(">")
@@ -832,10 +877,8 @@ async def test_escape_dismisses_dispatch_modal(tmp_path):
             await pilot.press("escape")
             assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
 
-
-@pytest.mark.rule("dispatch-confirm")
-async def test_ctrl_enter_dismisses_dispatch_modal_and_triggers_dispatch(tmp_path):
     with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
+        # ctrl+enter dismisses and triggers dispatch
         app = BurrowApp(request=Request(summary="", repo_root=tmp_path))
         async with app.run_test() as pilot:
             with patch.object(app, "_run_dispatch") as mock_dispatch:
@@ -843,22 +886,6 @@ async def test_ctrl_enter_dismisses_dispatch_modal_and_triggers_dispatch(tmp_pat
                 await pilot.press("ctrl+j")
                 assert not any(isinstance(s, DispatchModal) for s in app.screen_stack)
                 mock_dispatch.assert_called_once()
-
-
-@pytest.mark.rule("dispatch-modal-summary")
-async def test_dispatch_modal_shows_summary_and_comments(tmp_path):
-    (tmp_path / "foo.py").write_text("line1\nline2\nline3\nline4\n")
-    request = Request(summary="my review", repo_root=tmp_path)
-    request.add_comment(file="foo.py", first_line=2, last_line=2, body="fix this")
-    with patch("burrow.tui.get_diff", return_value=SAMPLE_DIFF):
-        app = BurrowApp(request=request)
-        async with app.run_test() as pilot:
-            await pilot.press(">")
-            modal = next(s for s in app.screen_stack if isinstance(s, DispatchModal))
-            text = " ".join(str(w.render()) for w in modal.query(Static))
-            assert "my review" in text
-            assert "fix this" in text
-            assert "foo.py" in text
 
 
 @pytest.mark.rule("dispatch-invocation")

@@ -10,7 +10,7 @@ from textual.screen import ModalScreen
 from textual.keys import key_to_character
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Static, TextArea
+from textual.widgets import LoadingIndicator, Static, TextArea
 from textual.containers import ScrollableContainer, Vertical
 from textual.worker import Worker
 from unidiff import PatchSet
@@ -432,9 +432,60 @@ class WaitingModal(ModalScreen):
 
     def compose(self):
         yield Static("Waiting for agent response…")
+        yield LoadingIndicator()
 
     def _on_key(self, event):
         event.stop()
+
+
+class ResponseSummaryModal(ModalScreen):
+    DEFAULT_CSS = """
+    ResponseSummaryModal {
+        align: center middle;
+    }
+    ResponseSummaryModal #response-container {
+        width: 60;
+        height: auto;
+        border: solid $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    ResponseSummaryModal #response-title {
+        background: $accent;
+        color: $text;
+        padding: 0 1;
+        height: 1;
+        margin-bottom: 1;
+    }
+    ResponseSummaryModal #response-hint {
+        color: $text-muted;
+        padding: 0 1;
+        height: 1;
+        text-align: right;
+        margin-top: 1;
+    }
+    """
+
+    def __init__(self, response):
+        super().__init__()
+        self._response = response
+
+    def compose(self):
+        from collections import Counter
+        counts = Counter(c.status for c in self._response.comments)
+        with Vertical(id="response-container"):
+            yield Static("Agent response", id="response-title")
+            yield Static(self._response.summary or "(no summary)")
+            yield Static("")
+            for status in ("done", "partial", "refused", "blocked"):
+                n = counts.get(status, 0)
+                if n:
+                    yield Static(f"  {status}: {n}")
+            yield Static("any key to dismiss", id="response-hint")
+
+    def _on_key(self, event):
+        event.stop()
+        self.dismiss()
 
 
 class DispatchModal(ModalScreen):
@@ -472,20 +523,22 @@ class DispatchModal(ModalScreen):
     def compose(self):
         with Vertical(id="dispatch-container"):
             yield Static("Dispatch review", id="dispatch-title")
-            summary = self._request.summary or "(no summary)"
-            yield Static(f"Summary: {summary}")
+            yield TextArea(self._request.summary, id="dispatch-summary")
             yield Static("")
             for comment in self._request.comments:
                 yield Static(f"  {comment.file}:{comment.first_line}–{comment.last_line}  {comment.body}")
             yield Static("ctrl+enter  dispatch    esc  cancel", id="dispatch-hint")
 
+    def on_mount(self):
+        self.query_one("#dispatch-summary", TextArea).focus()
+
     def _on_key(self, event):
         if event.key == "ctrl+j":
             event.stop()
-            self.dismiss(True)
+            self.dismiss(self.query_one("#dispatch-summary", TextArea).text)
         elif event.key == "escape":
             event.stop()
-            self.dismiss(False)
+            self.dismiss(None)
 
 
 class BurrowApp(App):
@@ -803,8 +856,10 @@ class BurrowApp(App):
     def action_dispatch(self):
         self.push_screen(DispatchModal(self.request), self._on_dispatch_result)
 
-    def _on_dispatch_result(self, confirmed):
-        if confirmed:
+    def _on_dispatch_result(self, summary):
+        if summary is not None:
+            self.request.summary = summary.strip()
+            self.request.save()
             self.run_worker(self._run_dispatch(), exclusive=True)
 
     async def _run_dispatch(self):
@@ -819,6 +874,7 @@ class BurrowApp(App):
             self.push_screen(ErrorModal("Agent exited successfully but response.json is missing or invalid."), self._on_error_result)
             return
         self.load_response(response)
+        self.push_screen(ResponseSummaryModal(response))
 
     def _on_error_result(self, retry):
         if retry:
