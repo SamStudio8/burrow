@@ -1,5 +1,6 @@
 import subprocess
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from rich.text import Text
 from burrow.dispatch import run_agent
@@ -10,11 +11,17 @@ from textual.screen import ModalScreen
 from textual.keys import key_to_character
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import LoadingIndicator, Static, TextArea
-from textual.containers import ScrollableContainer, Vertical
+from textual.widgets import DataTable, LoadingIndicator, Static, TextArea
+from textual.containers import Horizontal, ScrollableContainer, Vertical
 from textual.worker import Worker
 from unidiff import PatchSet
 from watchfiles import awatch
+
+
+class ModalBinding(NamedTuple):
+    key: str        # internal Textual key string, e.g. "ctrl+j"
+    label: str      # display label, e.g. "ctrl+enter"
+    description: str  # short action name shown in hint
 
 
 def colour_line(line):
@@ -291,6 +298,9 @@ class HelpOverlay(Widget):
 
 
 class SummaryModal(ModalScreen):
+    CONFIRM = ModalBinding("ctrl+j", "ctrl+enter", "save")
+    DISMISS = ModalBinding("escape", "esc", "cancel")
+
     DEFAULT_CSS = """
     SummaryModal {
         align: center middle;
@@ -327,25 +337,28 @@ class SummaryModal(ModalScreen):
         self._summary = summary
 
     def compose(self):
+        hint = f"{self.CONFIRM.label}  {self.CONFIRM.description}    {self.DISMISS.label}  {self.DISMISS.description}"
         with Vertical(id="summary-container"):
             yield Static("Edit session summary", id="summary-title")
             yield TextArea(self._summary)
-            #todo use the hint
-            yield Static("ctrl+enter  save    esc  cancel", id="summary-hint")
+            yield Static(hint, id="summary-hint")
 
     def on_mount(self):
         self.query_one(TextArea).focus()
 
     def _on_key(self, event):
-        if event.key == "ctrl+j":  # ctrl+enter in most terminals
+        if event.key == self.CONFIRM.key:
             event.stop()
             self.dismiss(self.query_one(TextArea).text)
-        elif event.key == "escape":
+        elif event.key == self.DISMISS.key:
             event.stop()
             self.dismiss(None)
 
 
 class StaleSessionModal(ModalScreen):
+    CONFIRM = ModalBinding("y", "y", "start new session")
+    DISMISS = ModalBinding("n", "n", "quit")
+
     DEFAULT_CSS = """
     StaleSessionModal {
         align: center middle;
@@ -360,16 +373,16 @@ class StaleSessionModal(ModalScreen):
     """
 
     def compose(self):
+        hint = f"  {self.CONFIRM.label}  {self.CONFIRM.description.capitalize()}\n  {self.DISMISS.label}  {self.DISMISS.description.capitalize()}"
         yield Static(
             "Session has comments that no longer map to valid file locations.\n"
-            "Discard existing request and start new session?\n\n"
-            "  y  Start new session\n"
-            "  n  Quit"
+            f"Discard existing request and start new session?\n\n"
+            f"{hint}"
         )
 
     def _on_key(self, event):
         event.stop()
-        self.dismiss(event.key == "y")
+        self.dismiss(event.key == self.CONFIRM.key)
 
 
 class BurrowHeader(Static):
@@ -388,6 +401,9 @@ class BurrowHeader(Static):
 
 
 class ErrorModal(ModalScreen):
+    CONFIRM = ModalBinding("ctrl+j", "ctrl+enter", "try again")
+    DISMISS = ModalBinding("escape", "esc", "cancel")
+
     DEFAULT_CSS = """
     ErrorModal {
         align: center middle;
@@ -406,14 +422,12 @@ class ErrorModal(ModalScreen):
         self._message = message
 
     def compose(self):
-        yield Static(self._message + "\n\n  ctrl+enter  Try again    esc  Cancel")
+        hint = f"  {self.CONFIRM.label}  {self.CONFIRM.description.capitalize()}    {self.DISMISS.label}  {self.DISMISS.description.capitalize()}"
+        yield Static(self._message + f"\n\n{hint}")
 
     def _on_key(self, event):
         event.stop()
-        if event.key == "ctrl+j":
-            self.dismiss(True)
-        else:
-            self.dismiss(False)
+        self.dismiss(event.key == self.CONFIRM.key)
 
 
 class WaitingModal(ModalScreen):
@@ -439,6 +453,8 @@ class WaitingModal(ModalScreen):
 
 
 class ResponseSummaryModal(ModalScreen):
+    DISMISS = ModalBinding("any", "any key", "dismiss")
+
     DEFAULT_CSS = """
     ResponseSummaryModal {
         align: center middle;
@@ -481,7 +497,7 @@ class ResponseSummaryModal(ModalScreen):
                 n = counts.get(status, 0)
                 if n:
                     yield Static(f"  {status}: {n}")
-            yield Static("any key to dismiss", id="response-hint")
+            yield Static(f"{self.DISMISS.label} to {self.DISMISS.description}", id="response-hint")
 
     def _on_key(self, event):
         event.stop()
@@ -489,54 +505,130 @@ class ResponseSummaryModal(ModalScreen):
 
 
 class DispatchModal(ModalScreen):
+    CONFIRM = ModalBinding("ctrl+j", "ctrl+enter", "dispatch")
+    DISMISS = ModalBinding("escape", "esc", "cancel")
+
     DEFAULT_CSS = """
     DispatchModal {
         align: center middle;
     }
     DispatchModal #dispatch-container {
-        width: 80;
-        height: auto;
+        width: 90%;
+        max-width: 120;
+        max-height: 60%;
         border: solid $accent;
         background: $surface;
-        padding: 1 2;
     }
     DispatchModal #dispatch-title {
         background: $accent;
         color: $text;
         padding: 0 1;
         height: 1;
-        margin-bottom: 1;
+    }
+    DispatchModal #dispatch-columns {
+        height: 1fr;
+    }
+    DispatchModal #dispatch-left {
+        width: 1fr;
+        border-right: solid $accent;
+        padding: 0 1;
+    }
+    DispatchModal #dispatch-right {
+        width: 2fr;
+        padding: 0 1;
+    }
+    DispatchModal #dispatch-summary {
+        height: 1fr;
+        border: none;
+    }
+    DispatchModal #dispatch-summary:focus {
+        border: none;
+    }
+    DispatchModal DataTable {
+        height: auto;
+    }
+    DispatchModal #dispatch-detail {
+        height: auto;
+        color: $text-muted;
+        padding: 1 0 0 0;
     }
     DispatchModal #dispatch-hint {
         color: $text-muted;
         padding: 0 1;
         height: 1;
         text-align: right;
-        margin-top: 1;
     }
     """
 
-    def __init__(self, request):
+    def __init__(self, request, hunks):
         super().__init__()
         self._request = request
+        self._hunks = hunks
 
     def compose(self):
-        with Vertical(id="dispatch-container"):
-            yield Static("Dispatch review", id="dispatch-title")
-            yield TextArea(self._request.summary, id="dispatch-summary")
-            yield Static("")
-            for comment in self._request.comments:
-                yield Static(f"  {comment.file}:{comment.first_line}–{comment.last_line}  {comment.body}")
-            yield Static("ctrl+enter  dispatch    esc  cancel", id="dispatch-hint")
+        hint = f"{self.CONFIRM.label}  {self.CONFIRM.description}    {self.DISMISS.label}  {self.DISMISS.description}"
+        yield Static("Dispatch review", id="dispatch-title")
+        with Horizontal(id="dispatch-columns"):
+            with Vertical(id="dispatch-left"):
+                yield TextArea(self._request.summary, id="dispatch-summary")
+            with Vertical(id="dispatch-right"):
+                table = DataTable(id="dispatch-table", cursor_type="row", show_header=True)
+                yield table
+                yield Static("", id="dispatch-detail")
+        yield Static(hint, id="dispatch-hint")
 
     def on_mount(self):
+        table = self.query_one(DataTable)
+        table.add_columns("File", "Lines")
+        for comment in self._request.comments:
+            table.add_row(comment.file, f"{comment.first_line}–{comment.last_line}", key=str(comment.id))
+        self._update_detail(0)
         self.query_one("#dispatch-summary", TextArea).focus()
 
+    def _update_detail(self, row_index):
+        if not self._request.comments:
+            return
+        comment = self._request.comments[row_index]
+        location = None
+        for hunk_idx, hunk in enumerate(self._hunks):
+            if hunk.file != comment.file:
+                continue
+            target_line = hunk.target_start
+            for line_idx, line in enumerate(hunk.lines):
+                if target_line == comment.last_line:
+                    first_line_idx = line_idx - (comment.last_line - comment.first_line)
+                    location = (hunk_idx, max(first_line_idx, 0), line_idx)
+                    break
+                if not line.startswith("-"):
+                    target_line += 1
+            if location:
+                break
+        text = comment.body
+        if location:
+            hunk_idx, first_line_idx, last_line_idx = location
+            hunk = self._hunks[hunk_idx]
+            diff_lines = hunk.lines[first_line_idx:last_line_idx + 1]
+            text += "\n\n" + "".join(l.rstrip("\n") + "\n" for l in diff_lines)
+        self.query_one("#dispatch-detail", Static).update(text)
+
+    def on_data_table_row_highlighted(self, event):
+        self._update_detail(event.cursor_row)
+
     def _on_key(self, event):
-        if event.key == "ctrl+j":
+        focused = self.focused
+        if isinstance(focused, DataTable):
+            if event.key == "j":
+                event.stop()
+                focused.action_cursor_down()
+                return
+            if event.key == "k":
+                event.stop()
+                focused.action_cursor_up()
+                return
+        if event.key == self.CONFIRM.key:
             event.stop()
             self.dismiss(self.query_one("#dispatch-summary", TextArea).text)
-        elif event.key == "escape":
+        elif event.key == self.DISMISS.key:
             event.stop()
             self.dismiss(None)
 
@@ -847,7 +939,7 @@ class BurrowApp(App):
 
 
     def action_dispatch(self):
-        self.push_screen(DispatchModal(self.request), self._on_dispatch_result)
+        self.push_screen(DispatchModal(self.request, self.hunks), self._on_dispatch_result)
 
     def _on_dispatch_result(self, summary):
         if summary is not None:

@@ -369,7 +369,7 @@ flowchart TD
 | Node | Slug | Statement | Tags |
 |---|---|---|---|
 | input | `dispatch-invocation` | SHALL open a finalise modal when the user presses `>`. | interface, usability |
-| modal | `dispatch-modal-summary` | SHALL display the session summary as an editable text field and a list of all comments (file, line range, body) in the finalise modal, allowing the summary to be updated before dispatch. | usability |
+| modal | `dispatch-modal-summary` | SHALL display the session summary as an editable text field (left column) and a table of comments showing file and line range (right column) in the finalise modal. The user SHALL be able to tab between the summary and the comment table. `j`/`k` SHALL navigate table rows. A detail pane below the table SHALL show the selected comment body and its anchored diff lines. | usability |
 | confirm | `dispatch-confirm` | SHALL dispatch the request when the user presses `ctrl+enter` in the finalise modal, and dismiss on `escape`. | usability |
 | dispatch | `dispatch-spawn` | SHALL invoke the agent by spawning `claude -p --allowedTools Bash Read Edit Write` with the preamble and request JSON fed to stdin, in the repository root as working directory. | interface |
 | dispatch | `dispatch-spawner-hardcoded` | The agent spawner command SHALL be hardcoded as `claude -p --allowedTools Bash Read Edit Write` for this version. | configuration |
